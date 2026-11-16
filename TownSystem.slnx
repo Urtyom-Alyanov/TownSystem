@@ -2,4 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/TownSystem.SharedLib/TownSystem.SharedLib.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="TownSystem.SharedLib.Tests/TownSystem.SharedLib.Tests.csproj" />
+  </Folder>
+  <Folder Name="/ui/">
+    <Project Path="TownSystem.UIApp/TownSystem.UIApp.csproj" />
+    <Project Path="TownSystem.UILib/TownSystem.UILib.csproj" />
+  </Folder>
 </Solution>
