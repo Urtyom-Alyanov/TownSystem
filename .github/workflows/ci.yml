@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ "main", "master" ]
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore TownSystem.slnx
+
+      - name: Build
+        run: dotnet build TownSystem.slnx --configuration Release --no-restore
+
+      - name: Test with coverage (>=70%)
+        shell: pwsh
+        run: |
+          dotnet test TownSystem.slnx --configuration Release --no-build `
+            --collect:"XPlat Code Coverage" `
+            --results-directory ./TestResults
+
+          $coverageFile = Get-ChildItem -Path ./TestResults -Recurse -Filter "coverage.cobertura.xml" | Select-Object -First 1
+          if (-not $coverageFile) {
+            Write-Error "coverage.cobertura.xml not found"
+            exit 1
+          }
+
+          [xml]$xml = Get-Content $coverageFile.FullName
+          $lineRate = [double]$xml.coverage.'line-rate'
+          $percent = [math]::Round($lineRate * 100, 2)
+          Write-Host "Line coverage: $percent%"
+          if ($percent -lt 70) {
+            Write-Error "Coverage $percent% is below 70%"
+            exit 1
+          }
+               
