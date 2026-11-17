@@ -21,6 +21,9 @@ jobs:
 
       - name: Restore
         run: dotnet restore TownSystem.slnx
+        
+      - name: Code Style check
+        run: dotnet format --verify-no-changes --no-restore
 
       - name: Build
         run: dotnet build TownSystem.slnx --configuration Release --no-restore
