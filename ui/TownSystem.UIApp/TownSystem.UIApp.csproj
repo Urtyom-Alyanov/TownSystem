@@ -8,4 +8,9 @@
         <UseWPF>true</UseWPF>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\TownSystem.Automotive\TownSystem.Automotive.csproj" />
+      <ProjectReference Include="..\..\TownSystem.Logistics\TownSystem.Logistics.csproj" />
+    </ItemGroup>
+
 </Project>

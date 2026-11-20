@@ -7,4 +7,9 @@
         <ImplicitUsings>enable</ImplicitUsings>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\TownSystem.Automotive\TownSystem.Automotive.csproj" />
+      <ProjectReference Include="..\..\TownSystem.Logistics\TownSystem.Logistics.csproj" />
+    </ItemGroup>
+
 </Project>
