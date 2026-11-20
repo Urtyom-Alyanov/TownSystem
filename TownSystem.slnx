@@ -1,9 +1,13 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/TownSystem.SharedLib/TownSystem.SharedLib.csproj" />
+    <Project Path="TownSystem.Automotive/TownSystem.Automotive.csproj" Id="a7fe574a-75a5-41d8-b523-bf293029e9e3" />
+    <Project Path="TownSystem.Logistics/TownSystem.Logistics.csproj" Id="cf73204c-2c70-4510-8fce-7fbda7a1c236" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TownSystem.SharedLib.Tests/TownSystem.SharedLib.Tests.csproj" />
+    <Project Path="TownSystem.Automotive.Tests/TownSystem.Automotive.Tests.csproj" Id="e11d27ea-957b-40ef-b043-0a29f97c1c89" />
+    <Project Path="TownSystem.Logistics.Tests/TownSystem.Logistics.Tests.csproj" Id="d7b3a148-b308-472d-bfbd-b856981e0f59" />
   </Folder>
   <Folder Name="/ui/">
     <Project Path="ui/TownSystem.UIApp/TownSystem.UIApp.csproj" />
