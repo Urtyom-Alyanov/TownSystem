@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TownSystem.Map\TownSystem.Map.csproj" />
+    <ProjectReference Include="..\TownSystem.UILib\TownSystem.UILib.csproj" />
   </ItemGroup>
 
   <ItemGroup>
