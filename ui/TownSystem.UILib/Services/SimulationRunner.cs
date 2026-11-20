@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows.Threading;
+
 using TownSystem.SharedLib.Simulation;
 using TownSystem.UILib.Mvvm;
 

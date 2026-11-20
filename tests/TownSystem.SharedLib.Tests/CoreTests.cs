@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
+
 using TownSystem.SharedLib.Core;
 using TownSystem.SharedLib.Events;
 using TownSystem.SharedLib.Persistence;
 using TownSystem.SharedLib.Simulation;
-using Xunit;
 
 namespace TownSystem.SharedLib.Tests;
 

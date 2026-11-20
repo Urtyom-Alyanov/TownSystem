@@ -1,4 +1,5 @@
 using System.Windows;
+
 using TownSystem.SharedLib.Simulation;
 using TownSystem.UILib.Mvvm;
 
