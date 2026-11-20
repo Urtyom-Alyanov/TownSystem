@@ -4,6 +4,15 @@ using System.Text;
 
 namespace TownSystem.Map.Models;
 
-internal class NaturalResource
+/// <summary>
+/// Перечисление доступных природных ресурсов
+/// </summary>
+public enum NaturalResource
 {
+    Iron,
+    Copper,
+    Oil,
+    Gas,
+    Coal,
+    Wood
 }

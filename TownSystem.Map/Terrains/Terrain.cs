@@ -4,6 +4,9 @@ using System.Text;
 
 namespace TownSystem.Map.Terrains;
 
+/// <summary>
+/// Родительский класс для всех типов местности
+/// </summary>
 public abstract class Terrain
 {
     public abstract string Name { get; }

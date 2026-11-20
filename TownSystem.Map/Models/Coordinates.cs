@@ -4,6 +4,9 @@ using System.Text;
 
 namespace TownSystem.Map.Models;
 
+/// <summary>
+/// Хранит координаты клетки на карте
+/// </summary>
 public class Coordinates
 {
     public int X { get; }
