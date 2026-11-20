@@ -21,8 +21,7 @@ public abstract class EntityBase : IEntity
     public EntityId Id { get; }
 
     /// <inheritdoc />
-    public string Name { get; protected 
-        set; }
+    public string Name { get; protected set; }
 
     /// <inheritdoc />
     public override string ToString() => $"{GetType().Name} {Name} [{Id}]";
