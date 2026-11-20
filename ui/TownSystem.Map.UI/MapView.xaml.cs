@@ -210,6 +210,10 @@ public partial class MapView : UserControl
         MapScale.ScaleX = scale;
         MapScale.ScaleY = scale;
 
+        // На общем плане сглаживаем картинку, чтоб тонкие реки не распадались на точки
+        double cellPixels = scale * CellSize * VisualTreeHelper.GetDpi(this).DpiScaleX;
+        RenderOptions.SetBitmapScalingMode(TerrainImage, cellPixels < 1 ? BitmapScalingMode.HighQuality : BitmapScalingMode.NearestNeighbor);
+
         // подстраиваем толщину линий, чтоб при зуме они не становились жирными
         if (reliefPen != null)
             reliefPen.Thickness = 0.7 / scale;

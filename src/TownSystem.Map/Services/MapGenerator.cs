@@ -9,6 +9,7 @@ namespace TownSystem.Map.Services;
 public class MapGenerator
 {
     // типы местности сами не меняются, поэтому можно использовать одни и те же объекты для разных клеток
+    private const int riverDepth = 3;
     private static readonly Plain plain = new Plain();
     private static readonly Forest forest = new Forest();
     private static readonly Mountain mountain = new Mountain();
@@ -70,10 +71,15 @@ public class MapGenerator
             int mouthX = coastColumn == 0 ? 0 : width - 1;
             int mouthY = (int)((coastRow + 0.35) * (height - 1) / (regions.GetLength(1) - 1));
             rivers = CreateRivers(heights, mouthX, mouthY);
+            LevelLowRiverBanks(heights, rivers);
         }
 
         double[,] depositDensity = CreateHeightPoints(18, 11);
         double[,] preferredResources = CreateHeightPoints(15, 9);
+
+        // Лес растёт отдельными участками, высота сама по себе его не определяет
+        double[,] forestRegions = CreateHeightPoints(17, 11);
+        double[,] forestEdges = CreateHeightPoints(38, 24);
         for (int y = 0; y < height; y++)
         {
             double mapY = (double)y / Math.Max(1, height - 1);
@@ -81,9 +87,17 @@ public class MapGenerator
             {
                 double mapX = (double)x / Math.Max(1, width - 1);
                 int elevation = heights[x, y];
-                Terrain terrain = rivers != null && rivers[x, y] ? river : GenerateTerrain(elevation);
+                bool isRiver = rivers != null && rivers[x, y];
+                Terrain terrain;
+                if (isRiver)
+                    terrain = river;
+                else if (elevation == 0 && rivers != null && IsBesideRiver(rivers, x, y))
+                    terrain = plain;
+                else
+                    terrain = GenerateTerrain(elevation, mapX, mapY, forestRegions, forestEdges);
+                Relief relief = isRiver ? new Relief(FindRiverLevel(heights, x, y) - riverDepth, riverDepth) : new Relief(elevation);
                 ResourceDeposit? deposit = GenerateDeposit(terrain, elevation, mapX, mapY, depositDensity, preferredResources);
-                MapCell cell = new MapCell(new Coordinates(x, y), terrain, new Relief(elevation), deposit);
+                MapCell cell = new MapCell(new Coordinates(x, y), terrain, relief, deposit);
                 map.SetCell(cell);
             }
         }
@@ -146,16 +160,16 @@ public class MapGenerator
             int x = startX + step * direction;
             course[step] = y;
 
-            // соединяем соседник столбцы, возле устья делаем реку чуть шире
-            int bank = main && progress > 0.55 ? 1 : 0;
-            int top = Math.Max(0, Math.Min(y, previousY) - bank);
-            int bottom = Math.Min(height - 1, Math.Max(y, previousY) + bank);
+            // Соединяем соседние столбцы, основная река расширяется ближе к устью
+            int northBank = main && progress > 0.85 ? 1 : 0;
+            int southBank = main && progress > 0.65 ? 1 : 0;
+            int top = Math.Max(0, Math.Min(y, previousY) - northBank);
+            int bottom = Math.Min(height - 1, Math.Max(y, previousY) + southBank);
             for (int row = top; row <= bottom; row++)
             {
                 if (heights[x, row] < 0)
                     continue;
 
-                heights[x, row] = -3;
                 rivers[x, row] = true;
             }
 
@@ -163,6 +177,43 @@ public class MapGenerator
         }
 
         return course;
+    }
+
+    // Делаем короткие пологие берега там где земля и так почти на уровне моря
+    private static void LevelLowRiverBanks(int[,] heights, bool[,] rivers)
+    {
+        for (int y = 0; y < heights.GetLength(1); y++)
+        {
+            for (int x = 0; x < heights.GetLength(0); x++)
+            {
+                int height = heights[x, y];
+                if (height > 0 && height <= 3 && !rivers[x, y] && IsBesideRiver(rivers, x, y))
+                    heights[x, y] = 0;
+            }
+        }
+    }
+
+    // Проверяем четыре соседние клетки, которые делят границу с этой клеткой
+    private static bool IsBesideRiver(bool[,] rivers, int x, int y)
+    {
+        return (x > 0 && rivers[x - 1, y]) || (y > 0 && rivers[x, y - 1]) ||
+               (x + 1 < rivers.GetLength(0) && rivers[x + 1, y]) || (y + 1 < rivers.GetLength(1) && rivers[x, y + 1]);
+    }
+
+    // Берём высоту воды рядом с руслом, чтобы река могла идти и выше уровня моря
+    private static int FindRiverLevel(int[,] heights, int x, int y)
+    {
+        int level = heights[x, y];
+        if (x > 0)
+            level = Math.Min(level, heights[x - 1, y]);
+        if (y > 0)
+            level = Math.Min(level, heights[x, y - 1]);
+        if (x + 1 < heights.GetLength(0))
+            level = Math.Min(level, heights[x + 1, y]);
+        if (y + 1 < heights.GetLength(1))
+            level = Math.Min(level, heights[x, y + 1]);
+
+        return Math.Max(0, level);
     }
 
     // Заполняем сетку случайными числами, потом используем её для высот и других расчётов
@@ -203,19 +254,17 @@ public class MapGenerator
         return part * part * (3 - 2 * part);
     }
 
-    // по высоте клетки решаем что тут будет: вода, равнина, лес или горы
-    private Terrain GenerateTerrain(int height)
+    // По высоте определяем воду и горы, а на остальной суше решаем где растёт лес
+    private Terrain GenerateTerrain(int height, double x, double y, double[,] forestRegions, double[,] forestEdges)
     {
         if (height < 0)
             return water;
 
-        if (height < 180)
-            return plain;
+        if (height >= 300)
+            return mountain;
 
-        if (height < 300)
-            return forest;
-
-        return mountain;
+        double trees = ReadHeight(forestRegions, x, y) + 0.3 * ReadHeight(forestEdges, x, y);
+        return trees > 0.16 ? forest : plain;
     }
 
     // Смотрим на местность и район, решаем будет ли тут ресурс и сколько его

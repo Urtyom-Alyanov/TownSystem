@@ -115,7 +115,7 @@
                     <StackPanel Orientation="Horizontal">
                         <Button Content="−" Click="ZoomOut" Style="{StaticResource ZoomButton}"
                                 AutomationProperties.Name="Уменьшить масштаб" ToolTip="Уменьшить масштаб"/>
-                        <TextBlock x:Name="ZoomText" Text="100 %" MinWidth="54" TextAlignment="Center"
+                        <TextBlock x:Name="ZoomText" Text="100 %" MinWidth="54" TextAlignment="Center" ToolTip="Масштаб относительно вида «По экрану»"
                                    Foreground="{StaticResource MutedColor}" VerticalAlignment="Center"/>
                         <Button Content="+" Click="ZoomIn" Style="{StaticResource ZoomButton}"
                                 AutomationProperties.Name="Увеличить масштаб" ToolTip="Увеличить масштаб"/>
@@ -226,8 +226,8 @@
                                     </Style.Triggers>
                                 </Style>
                             </TextBlock.Style>
-                            <Run Text="Глубина "/><Run Text="●" Foreground="#5EADCF"/><Run Text=" от 50 м   "/>
-                            <Run Text="●" Foreground="#A3D8E9"/><Run Text=" до 50 м"/>
+                            <Run Text="Глубина "/><Run Text="●" Foreground="#5EADCF"/><Run Text=" −50 м и глубже   "/>
+                            <Run Text="●" Foreground="#A3D8E9"/><Run Text=" выше −50 м"/>
                             <LineBreak/>
                             <Run Text="Высота "/><Run Text="●" Foreground="#ADCF91"/><Run Text=" 0–99   "/>
                             <Run Text="●" Foreground="#D2DD94"/><Run Text=" 100–199   "/>
@@ -270,8 +270,8 @@
                             <TextBlock Text="{Binding SelectedCell.TerrainName, FallbackValue=—}" Style="{StaticResource InfoValue}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,9,5">
-                            <TextBlock Text="Высота" Style="{StaticResource InfoLabel}"/>
-                            <TextBlock Text="{Binding SelectedCell.Height, StringFormat={}{0} м, FallbackValue=—}" Style="{StaticResource InfoValue}"/>
+                            <TextBlock Text="{Binding SelectedCell.ReliefLabel, FallbackValue=Высота}" Style="{StaticResource InfoLabel}"/>
+                            <TextBlock Text="{Binding SelectedCell.ReliefValue, StringFormat={}{0} м, FallbackValue=—}" Style="{StaticResource InfoValue}"/>
                         </StackPanel>
                         <StackPanel Margin="0,0,0,5">
                             <TextBlock Text="Размещение" Style="{StaticResource InfoLabel}"/>

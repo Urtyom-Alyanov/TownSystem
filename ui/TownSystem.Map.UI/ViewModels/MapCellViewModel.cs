@@ -17,6 +17,9 @@ public class MapCellViewModel : ViewModelBase
     public int X => Cell.Coordinates.X;
     public int Y => Cell.Coordinates.Y;
     public int Height => Cell.Relief.Height;
+    public string ReliefLabel => Cell.Terrain is WaterBody ? "Глубина" : "Высота";
+    // В карточке глубину показываем со знаком минус от поверхности воды
+    public int ReliefValue => Cell.Terrain is WaterBody ? -Cell.Relief.Depth : Height;
     public string CoordinatesText => $"X {X} · Y {Y}";
     public string TerrainName => Cell.Terrain.Name;
     public bool CanBuild => Cell.CanBuild;
@@ -68,10 +71,11 @@ public class MapCellViewModel : ViewModelBase
         NaturalResource.Oil => Brushes.Plum,
         NaturalResource.Gas => Brushes.MediumTurquoise,
         NaturalResource.Coal => Brushes.LightSlateGray,
+        NaturalResource.Wood => Brushes.LightGreen,
         _ => Brushes.Transparent
     };
 
-    // древесину показываем цветом клетки, для остальных ресурсов есть значки
+    // На общем плане древесину показываем цветом клетки, а остальные ресурсы точками
     public string DisplaySymbol
     {
         get
@@ -125,7 +129,7 @@ public class MapCellViewModel : ViewModelBase
         get
         {
             if (Cell.Terrain is WaterBody)
-                return Height <= -50 ? 0 : 1;
+                return Cell.Relief.Depth >= 50 ? 0 : 1;
 
             return 2 + Math.Clamp(Height / 100, 0, 4);
         }

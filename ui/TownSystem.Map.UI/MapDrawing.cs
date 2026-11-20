@@ -123,10 +123,9 @@ internal static class MapDrawing
                 for (int column = visibleCells.X; column < visibleCells.X + visibleCells.Width; column++)
                 {
                     MapCellViewModel cell = model.Cells[row * model.Width + column];
-                    string symbol = cell.DisplaySymbol;
-                    // если подписать все клетки, будет каша, поэтому оставляем часть значков
-                    bool showSymbol = cell.IsSelected || (row % 5 == 0 && column % 5 == 0);
-                    if (symbol.Length == 0 || !showSymbol)
+                    string symbol = cell.ResourceSymbol;
+                    // При приближении значок нужен у каждого видимого ресурса
+                    if (symbol.Length == 0 || cell.ResourceAmount == 0)
                         continue;
 
                     // один и тот же значок не рисуем заново для каждой клетки
