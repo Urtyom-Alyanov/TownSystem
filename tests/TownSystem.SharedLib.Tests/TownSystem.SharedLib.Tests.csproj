@@ -19,7 +19,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\src\TownSystem.SharedLib\TownSystem.SharedLib.csproj" />
+      <ProjectReference Include="..\..\src\TownSystem.SharedLib\TownSystem.SharedLib.csproj" />
     </ItemGroup>
 
 </Project>
