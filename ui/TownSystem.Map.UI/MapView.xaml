@@ -283,7 +283,7 @@
                         </StackPanel>
                         <StackPanel>
                             <TextBlock Text="Запасы" Style="{StaticResource InfoLabel}"/>
-                            <TextBlock Text="{Binding SelectedCell.ResourceAmount, FallbackValue=—}" Style="{StaticResource InfoValue}"/>
+                            <TextBlock Text="{Binding SelectedCell.ResourceAmount, StringFormat={}{0:G10}, ConverterCulture=ru-RU, FallbackValue=—}" Style="{StaticResource InfoValue}"/>
                         </StackPanel>
                     </UniformGrid>
                 </StackPanel>

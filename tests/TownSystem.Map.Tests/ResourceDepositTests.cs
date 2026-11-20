@@ -27,7 +27,7 @@ public class ResourceDepositTests
         ResourceDeposit deposit = new ResourceDeposit(
             NaturalResource.Iron, 1000);
 
-        int extracted = deposit.Extract(200);
+        double extracted = deposit.Extract(200);
 
         Assert.That(extracted, Is.EqualTo(200));
         Assert.That(deposit.Amount, Is.EqualTo(800));
@@ -40,7 +40,7 @@ public class ResourceDepositTests
         ResourceDeposit deposit = new ResourceDeposit(
             NaturalResource.Iron, 100);
 
-        int extracted = deposit.Extract(500);
+        double extracted = deposit.Extract(500);
 
         Assert.That(extracted, Is.EqualTo(100));
         Assert.That(deposit.Amount, Is.EqualTo(0));
@@ -57,11 +57,37 @@ public class ResourceDepositTests
         Assert.That(deposit.Extract(100), Is.EqualTo(0));
     }
 
-    // с минусовым запасом создать месторождение нельзя
+    // Дробный запас списывается до нуля даже если запрос больше остатка
     [Test]
-    public void NegativeAmount()
+    public void ExtractFractionalStock()
+    {
+        ResourceDeposit deposit = new ResourceDeposit(NaturalResource.Iron, 1.25);
+
+        Assert.That(deposit.InitialAmount, Is.EqualTo(1.25));
+        Assert.That(deposit.Extract(0.5), Is.EqualTo(0.5));
+        Assert.That(deposit.Amount, Is.EqualTo(0.75));
+        Assert.That(deposit.Extract(1), Is.EqualTo(0.75));
+        Assert.That(deposit.IsEmpty, Is.True);
+    }
+
+    // Нельзя выдать ресурс если запрос меньше точности хранимого запаса
+    [Test]
+    public void RequestBelowStockPrecisionDoesNotExtract()
+    {
+        ResourceDeposit deposit = new ResourceDeposit(NaturalResource.Iron, 5);
+
+        Assert.That(deposit.Extract(double.Epsilon), Is.Zero);
+        Assert.That(deposit.Amount, Is.EqualTo(5));
+    }
+
+    // Не даём создать месторождение с некорректным запасом
+    [TestCase(-100.0)]
+    [TestCase(double.NaN)]
+    [TestCase(double.PositiveInfinity)]
+    [TestCase(double.NegativeInfinity)]
+    public void InvalidInitialAmount(double amount)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            new ResourceDeposit(NaturalResource.Iron, -100));
+            new ResourceDeposit(NaturalResource.Iron, amount));
     }
 }

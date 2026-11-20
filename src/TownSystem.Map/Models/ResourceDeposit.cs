@@ -7,32 +7,37 @@ public class ResourceDeposit
 {
     public NaturalResource Resource { get; }
 
-    public int InitialAmount { get; }
+    public double InitialAmount { get; }
 
-    public int Amount { get; private set; }
+    public double Amount { get; private set; }
 
     public bool IsEmpty => Amount == 0;
 
     // Запоминаем какой это ресурс и сколько его изначально было
-    public ResourceDeposit(NaturalResource resource, int amount)
+    public ResourceDeposit(NaturalResource resource, double amount)
     {
-        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        if (!double.IsFinite(amount) || amount < 0)
+            throw new ArgumentOutOfRangeException(nameof(amount));
 
         Resource = resource;
         InitialAmount = amount;
         Amount = amount;
     }
 
-    // берём сколько получилось добыть и вычитаем это из запаса
-    public int Extract(int amount)
+    // Берём сколько запросили или сколько осталось, если запаса меньше
+    public double Extract(double amount)
     {
-        if (amount <= 0)
+        if (!double.IsFinite(amount) || amount <= 0)
             return 0;
 
-        int extracted = Math.Min(amount, Amount);
+        double extracted = Math.Min(amount, Amount);
+        double remaining = Amount - extracted;
 
-        Amount -= extracted;
+        // Если запрос слишком мал для точности числа, запас не изменился
+        if (remaining == Amount)
+            return 0;
 
+        Amount = remaining;
         return extracted;
     }
 }

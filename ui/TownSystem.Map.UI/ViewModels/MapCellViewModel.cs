@@ -51,7 +51,7 @@ public class MapCellViewModel : ViewModelBase
         _ => "Отсутствует"
     };
 
-    public int ResourceAmount => Cell.Deposit?.Amount ?? 0;
+    public double ResourceAmount => Cell.Deposit?.Amount ?? 0;
 
     public string ResourceSymbol => Cell.Deposit?.Resource switch
     {
