@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TownSystem.Residential\TownSystem.Residential.csproj" />
+    <ProjectReference Include="..\..\src\TownSystem.Population\TownSystem.Population.csproj" />
     <ProjectReference Include="..\..\src\TownSystem.SharedLib\TownSystem.SharedLib.csproj" />
   </ItemGroup>
 

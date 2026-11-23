@@ -1,4 +1,5 @@
 using TownSystem.SharedLib.Contracts;
+using TownSystem.SharedLib.Contracts;
 using TownSystem.SharedLib.Core;
 
 namespace TownSystem.Population;
@@ -7,7 +8,7 @@ namespace TownSystem.Population;
 /// Сервис население города.
 /// Управляет всеми горожанами, семьями и их размещением по жилым зданиям.
 /// </summary>
-public class PopulationService : IPopulationService
+public sealed class PopulationService : IPopulationService
 {
     private readonly Dictionary<EntityId, Citizen> peopleDictionary = new();
     private readonly Dictionary<EntityId, Family> familiesDictionary = new();
