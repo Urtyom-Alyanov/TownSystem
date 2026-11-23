@@ -9,6 +9,7 @@ namespace TownSystem.Population;
 public class Family
 {
     private readonly List<Citizen> members = new();
+    private PopulationService? ownerService;
 
     /// <summary>
     /// Создаёт семью.
@@ -41,8 +42,11 @@ public class Family
     /// </summary>
     public int MemberCount => members.Count;
 
+    internal PopulationService? OwnerService => ownerService;
+
     /// <summary>
     /// Добавляет члена в семью.
+    /// Если семья уже зарегистрирована в PopulationService, операция синхронизируется с ним.
     /// </summary>
     /// <param name="citizen">Горожанин</param>
     public void AddMember(Citizen citizen)
@@ -50,17 +54,36 @@ public class Family
         if (citizen == null)
             throw new ArgumentNullException(nameof(citizen));
 
-        if (!members.Contains(citizen))
-            members.Add(citizen);
+        if (HasMember(citizen))
+            return;
+
+        if (ownerService != null)
+        {
+            if (!ownerService.AddMemberToFamily(Id, citizen))
+                throw new InvalidOperationException("Не удалось добавить гражданина в зарегистрированную семью: гражданин не зарегистрирован в сервисе или уже состоит в другой семье/жилье.");
+            return;
+        }
+
+        members.Add(citizen);
     }
 
     /// <summary>
     /// Удаляет члена из семьи (например, при смерти).
+    /// Если семья уже зарегистрирована в PopulationService, операция синхронизируется с ним.
     /// </summary>
     /// <param name="citizen">Горожанин</param>
     public void RemoveMember(Citizen citizen)
     {
-        members.Remove(citizen);
+        if (citizen == null)
+            return;
+
+        if (ownerService != null)
+        {
+            ownerService.RemoveMemberFromFamily(Id, citizen.Id);
+            return;
+        }
+
+        RemoveMemberInternal(citizen);
     }
 
     /// <summary>
@@ -70,7 +93,36 @@ public class Family
     /// <returns>true если член в семье, иначе false</returns>
     public bool HasMember(Citizen citizen)
     {
-        return members.Contains(citizen);
+        if (citizen == null)
+            return false;
+
+        return members.Any(m => ReferenceEquals(m, citizen) || m.Id == citizen.Id);
+    }
+
+    internal void AttachToService(PopulationService service)
+    {
+        ownerService = service;
+    }
+
+    internal void DetachFromService()
+    {
+        ownerService = null;
+    }
+
+    internal void AddMemberInternal(Citizen citizen)
+    {
+        if (!HasMember(citizen))
+            members.Add(citizen);
+    }
+
+    internal bool RemoveMemberInternal(Citizen citizen)
+    {
+        var index = members.FindIndex(m => ReferenceEquals(m, citizen) || m.Id == citizen.Id);
+        if (index < 0)
+            return false;
+
+        members.RemoveAt(index);
+        return true;
     }
 
     /// <summary>

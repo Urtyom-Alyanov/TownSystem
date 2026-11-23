@@ -40,7 +40,7 @@ public class Citizen : IPerson
     public Position Position { get; set; }
 
     /// <inheritdoc />
-    public EntityId? HomeId { get; set; }
+    public EntityId? HomeId { get; internal set; }
 
     /// <inheritdoc />
     public EntityId? WorkplaceId { get; set; }

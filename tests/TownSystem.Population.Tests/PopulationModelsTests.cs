@@ -43,18 +43,16 @@ public class PopulationModelsTests
     {
         var citizen = new Citizen(EntityId.New(), "Тест", 25, new Position(0, 0));
         var newPosition = new Position(5.0, 10.0);
-        var homeId = EntityId.New();
         var workplaceId = EntityId.New();
 
         citizen.Position = newPosition;
-        citizen.HomeId = homeId;
         citizen.WorkplaceId = workplaceId;
         citizen.Education = EducationLevel.College;
         citizen.Health = 0.75;
         citizen.Age = 26;
 
         Assert.Equal(newPosition, citizen.Position);
-        Assert.Equal(homeId, citizen.HomeId);
+        Assert.Null(citizen.HomeId);
         Assert.Equal(workplaceId, citizen.WorkplaceId);
         Assert.Equal(EducationLevel.College, citizen.Education);
         Assert.Equal(0.75, citizen.Health);
@@ -243,16 +241,18 @@ public class PopulationModelsTests
     }
 
     [Fact]
-    public void Household_CanChangeBuilding()
+    public void Household_CanChangeBuildingThroughPopulationService()
     {
+        var service = new PopulationService();
         var family = new Family(EntityId.New(), "Семья");
         var oldBuildingId = EntityId.New();
         var newBuildingId = EntityId.New();
 
         var household = new Household(family, oldBuildingId);
+        Assert.True(service.RegisterHousehold(household));
         Assert.Equal(oldBuildingId, household.BuildingId);
 
-        household.BuildingId = newBuildingId;
+        Assert.True(service.MoveHousehold(family.Id, newBuildingId));
 
         Assert.Equal(newBuildingId, household.BuildingId);
     }
@@ -486,6 +486,129 @@ public class PopulationModelsTests
         service.UnregisterCitizen(citizen.Id);
 
         Assert.Null(service.GetResidence(citizen.Id));
+    }
+
+    [Fact]
+    public void PopulationService_SyncsCitizenHomeId_OnRegisterMoveAndUnregisterHousehold()
+    {
+        var service = new PopulationService();
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen);
+
+        service.RegisterCitizen(citizen);
+        Assert.Null(citizen.HomeId);
+
+        var building1 = EntityId.New();
+        var building2 = EntityId.New();
+        var household = new Household(family, building1);
+
+        Assert.True(service.RegisterHousehold(household));
+        Assert.Equal(building1, citizen.HomeId);
+        Assert.Equal(building1, service.GetResidence(citizen.Id));
+        Assert.Equal(building1, household.BuildingId);
+
+        Assert.True(service.MoveHousehold(family.Id, building2));
+        Assert.Equal(building2, citizen.HomeId);
+        Assert.Equal(building2, service.GetResidence(citizen.Id));
+        Assert.Equal(building2, household.BuildingId);
+
+        Assert.True(service.UnregisterHousehold(family.Id));
+        Assert.Null(citizen.HomeId);
+        Assert.Null(service.GetResidence(citizen.Id));
+    }
+
+    [Fact]
+    public void PopulationService_RegisterHousehold_WithUnregisteredCitizen_FailsAtomically()
+    {
+        var service = new PopulationService();
+        var registered = new Citizen(EntityId.New(), "Зарегистрированный", 30, new Position(0, 0));
+        var unregistered = new Citizen(EntityId.New(), "Незарегистрированный", 25, new Position(0, 0));
+
+        service.RegisterCitizen(registered);
+
+        var family = new Family(EntityId.New(), "Семья");
+        family.AddMember(registered);
+        family.AddMember(unregistered);
+
+        var buildingId = EntityId.New();
+        var household = new Household(family, buildingId);
+
+        Assert.False(service.RegisterHousehold(household));
+        Assert.Empty(service.Households);
+        Assert.Empty(service.Families);
+        Assert.Null(registered.HomeId);
+        Assert.Null(service.GetResidence(registered.Id));
+        Assert.Empty(service.GetResidentsOfBuilding(buildingId));
+    }
+
+    [Fact]
+    public void PopulationService_DoesNotAllowCitizenInTwoHouseholdsOrFamilies()
+    {
+        var service = new PopulationService();
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        service.RegisterCitizen(citizen);
+
+        var family1 = new Family(EntityId.New(), "Первая");
+        family1.AddMember(citizen);
+        var family2 = new Family(EntityId.New(), "Вторая");
+        family2.AddMember(citizen);
+
+        var building1 = EntityId.New();
+        var building2 = EntityId.New();
+
+        Assert.True(service.RegisterHousehold(new Household(family1, building1)));
+        Assert.False(service.RegisterFamily(family2));
+        Assert.False(service.RegisterHousehold(new Household(family2, building2)));
+
+        // Состояние первого домохозяйства не пострадало
+        Assert.Equal(building1, citizen.HomeId);
+        Assert.Equal(building1, service.GetResidence(citizen.Id));
+        Assert.Single(service.Households);
+    }
+
+    [Fact]
+    public void PopulationService_FamilyCompositionChanges_SyncWithHousehold()
+    {
+        var service = new PopulationService();
+        var parent = new Citizen(EntityId.New(), "Родитель", 30, new Position(0, 0));
+        var child = new Citizen(EntityId.New(), "Ребёнок", 1, new Position(0, 0));
+        var outsider = new Citizen(EntityId.New(), "Чужой", 40, new Position(0, 0));
+
+        service.RegisterCitizen(parent);
+        service.RegisterCitizen(child);
+        // outsider намеренно не регистрируем в PopulationService
+
+        var family = new Family(EntityId.New(), "Семья");
+        family.AddMember(parent);
+
+        var buildingId = EntityId.New();
+        Assert.True(service.RegisterHousehold(new Household(family, buildingId)));
+
+        // Добавляем нового члена через Family.AddMember — должен автоматически прописаться в доме
+        family.AddMember(child);
+        Assert.Equal(buildingId, child.HomeId);
+        Assert.Equal(buildingId, service.GetResidence(child.Id));
+        Assert.Equal(2, service.GetResidentsOfBuilding(buildingId).Count);
+
+        // Попытка добавить незарегистрированного гражданина в зарегистрированную семью должна отклоняться
+        Assert.False(service.AddMemberToFamily(family.Id, outsider));
+        Assert.Throws<InvalidOperationException>(() => family.AddMember(outsider));
+        Assert.Equal(2, family.MemberCount);
+
+        // Удаление члена семьи сбрасывает его жильё
+        family.RemoveMember(child);
+        Assert.Null(child.HomeId);
+        Assert.Null(service.GetResidence(child.Id));
+        Assert.Single(service.GetResidentsOfBuilding(buildingId));
+    }
+
+    [Fact]
+    public void Household_WithEmptyBuildingId_ThrowsArgumentException()
+    {
+        var family = new Family(EntityId.New(), "Семья");
+
+        Assert.Throws<ArgumentException>(() => new Household(family, default));
     }
 
     #endregion

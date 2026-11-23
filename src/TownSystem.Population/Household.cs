@@ -17,6 +17,9 @@ public class Household
     public Household(Family family, EntityId buildingId)
     {
         this.family = family ?? throw new ArgumentNullException(nameof(family));
+        if (buildingId == default)
+            throw new ArgumentException("Идентификатор здания не может быть пустым", nameof(buildingId));
+
         BuildingId = buildingId;
         MoveInDate = DateTime.UtcNow;
     }
@@ -27,9 +30,9 @@ public class Household
     public Family Family => family;
 
     /// <summary>
-    /// ID здания, где живёт семья.
+    /// ID здания, где живёт семья. Изменяется через PopulationService.
     /// </summary>
-    public EntityId BuildingId { get; set; }
+    public EntityId BuildingId { get; internal set; }
 
     /// <summary>
     /// Дата заселения в текущее здание.
@@ -51,6 +54,6 @@ public class Household
     /// <summary>
     /// Возвращает строковое представление для отладки.
     /// </summary>
-    public override string ToString() => 
+    public override string ToString() =>
         $"Household({Family.Name}, building={BuildingId}, satisfaction={Satisfaction:0.00})";
 }
