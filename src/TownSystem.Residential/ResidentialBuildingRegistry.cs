@@ -95,12 +95,15 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         if (buildings.ContainsKey(building.Id))
             return false;
 
-        // Проверка выхода за границы карты
-        if (!IsWithinMapBounds(building, currentMapService))
+        // Проверка геометрии и выхода за границы карты
+        if (!TryGetCellRange(building, currentMapService, out uint minX, out uint minY, out uint maxX, out uint maxY))
             return false;
 
-        // Проверка пригодности местности
-        if (!IsBuildableArea(building, currentMapService))
+        if (!currentMapService.InBounds(minX, minY) || !currentMapService.InBounds(maxX, maxY))
+            return false;
+
+        // Проверка пригодности местности по всем пересекаемым клеткам
+        if (!IsBuildableArea(minX, minY, maxX, maxY, currentMapService))
             return false;
 
         // Проверка пересечений с другими зданиями
@@ -146,9 +149,13 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <returns>Перечисление зданий в радиусе</returns>
     public IEnumerable<IBuilding> FindNear(Position center, double radius)
     {
-        return buildings.Values.Where(b =>
-            center.DistanceTo(b.Position) <= radius
-        );
+        if (!double.IsFinite(center.X) || !double.IsFinite(center.Y))
+            throw new ArgumentOutOfRangeException(nameof(center), "Координаты центра должны быть конечными числами");
+
+        if (double.IsNaN(radius) || radius < 0)
+            throw new ArgumentOutOfRangeException(nameof(radius), "Радиус поиска не может быть отрицательным");
+
+        return buildings.Values.Where(b => DistanceToBuilding(center, b) <= radius);
     }
 
     private IMapService GetMapService()
@@ -160,45 +167,88 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     }
 
     /// <summary>
-    /// Проверяет, находится ли здание полностью внутри границ карты.
+    /// Проверяет геометрию здания и вычисляет диапазон клеток карты,
+    /// которые пересекает прямоугольник [Position.X, Position.X + Width) × [Position.Y, Position.Y + Height).
     /// </summary>
-    private static bool IsWithinMapBounds(IBuilding building, IMapService currentMapService)
+    private static bool TryGetCellRange(
+        IBuilding building,
+        IMapService currentMapService,
+        out uint minX,
+        out uint minY,
+        out uint maxX,
+        out uint maxY)
     {
-        var minX = (uint)building.Position.X;
-        var minY = (uint)building.Position.Y;
-        var maxX = minX + building.Footprint.Width - 1;
-        var maxY = minY + building.Footprint.Height - 1;
+        minX = 0;
+        minY = 0;
+        maxX = 0;
+        maxY = 0;
 
-        // Проверяем границы карты для всех углов
-        if (!currentMapService.InBounds(minX, minY))
+        if (building.Footprint.Width == 0 || building.Footprint.Height == 0)
             return false;
 
-        if (!currentMapService.InBounds(maxX, maxY))
+        double startX = building.Position.X;
+        double startY = building.Position.Y;
+
+        if (!double.IsFinite(startX) || !double.IsFinite(startY))
             return false;
+
+        if (startX < 0 || startY < 0)
+            return false;
+
+        double endX = startX + building.Footprint.Width;
+        double endY = startY + building.Footprint.Height;
+
+        if (!double.IsFinite(endX) || !double.IsFinite(endY))
+            return false;
+
+        if (endX > currentMapService.Width || endY > currentMapService.Height)
+            return false;
+
+        minX = (uint)Math.Floor(startX);
+        minY = (uint)Math.Floor(startY);
+        maxX = (uint)(Math.Ceiling(endX) - 1.0);
+        maxY = (uint)(Math.Ceiling(endY) - 1.0);
 
         return true;
     }
 
     /// <summary>
-    /// Проверяет, что все клетки, занимаемые зданием, пригодны для постройки.
+    /// Проверяет, что все клетки в диапазоне пригодны для постройки.
     /// </summary>
-    private static bool IsBuildableArea(IBuilding building, IMapService currentMapService)
+    private static bool IsBuildableArea(uint minX, uint minY, uint maxX, uint maxY, IMapService currentMapService)
     {
-        var minX = (uint)building.Position.X;
-        var minY = (uint)building.Position.Y;
-        var maxX = minX + building.Footprint.Width - 1;
-        var maxY = minY + building.Footprint.Height - 1;
-
-        for (uint x = minX; x <= maxX; x++)
+        for (uint x = minX; ; x++)
         {
-            for (uint y = minY; y <= maxY; y++)
+            for (uint y = minY; ; y++)
             {
                 if (!currentMapService.IsBuildable(x, y))
                     return false;
+
+                if (y == maxY)
+                    break;
             }
+
+            if (x == maxX)
+                break;
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Вычисляет кратчайшее расстояние от точки до прямоугольника здания на карте.
+    /// </summary>
+    private static double DistanceToBuilding(Position point, IBuilding building)
+    {
+        double minX = building.Position.X;
+        double minY = building.Position.Y;
+        double maxX = minX + building.Footprint.Width;
+        double maxY = minY + building.Footprint.Height;
+
+        double dx = Math.Max(0.0, Math.Max(minX - point.X, point.X - maxX));
+        double dy = Math.Max(0.0, Math.Max(minY - point.Y, point.Y - maxY));
+
+        return Math.Sqrt(dx * dx + dy * dy);
     }
 
     /// <summary>

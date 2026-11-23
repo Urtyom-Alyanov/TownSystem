@@ -200,4 +200,55 @@ public class ResidentialBuildingTests
         Assert.Equal(8u, building.Capacity); // PrivateHouse: 4 * 2 = 8
         Assert.Equal(0.0, building.Wear);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Constructor_WithInvalidName_ThrowsArgumentException(string invalidName)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new ResidentialBuilding(invalidName, ResidentialBuildingType.PrivateHouse, TestPosition, TestFootprint, 1, TestDate));
+    }
+
+    [Theory]
+    [InlineData(0u, 2u)]
+    [InlineData(2u, 0u)]
+    [InlineData(0u, 0u)]
+    public void Constructor_WithZeroFootprint_ThrowsArgumentException(uint width, uint height)
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new ResidentialBuilding("Test", ResidentialBuildingType.PrivateHouse, TestPosition, new Footprint(width, height), 1, TestDate));
+    }
+
+    [Theory]
+    [InlineData(-1.0, 5.0)]
+    [InlineData(5.0, -0.5)]
+    [InlineData(double.NaN, 5.0)]
+    [InlineData(5.0, double.PositiveInfinity)]
+    public void Constructor_WithInvalidPosition_ThrowsArgumentOutOfRangeException(double x, double y)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ResidentialBuilding("Test", ResidentialBuildingType.PrivateHouse, new Position(x, y), TestFootprint, 1, TestDate));
+    }
+
+    [Fact]
+    public void AccumulateWear_WithNegativeDelta_ThrowsArgumentOutOfRangeException()
+    {
+        var building = new ResidentialBuilding("Test", ResidentialBuildingType.PrivateHouse, TestPosition, TestFootprint, 1, TestDate);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            building.AccumulateWear(TimeSpan.FromDays(-1)));
+    }
+
+    [Theory]
+    [InlineData(-100.0)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public void Maintain_WithInvalidCost_ThrowsArgumentOutOfRangeException(double invalidCost)
+    {
+        var building = new ResidentialBuilding("Test", ResidentialBuildingType.PrivateHouse, TestPosition, TestFootprint, 1, TestDate);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            building.Maintain(MaintenanceType.Repair, invalidCost));
+    }
 }

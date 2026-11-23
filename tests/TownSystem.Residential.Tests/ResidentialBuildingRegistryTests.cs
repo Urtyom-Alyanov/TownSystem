@@ -38,12 +38,6 @@ public class ResidentialBuildingRegistryTests
             return TerrainType.Plain;
         }
 
-        public bool IsBuildable(uint x, uint y)
-        {
-            // Всё можно строить
-            return true;
-        }
-
         public SharedLib.Contracts.ResourceDeposit? GetDeposit(uint x, uint y)
         {
             return null;
@@ -52,6 +46,13 @@ public class ResidentialBuildingRegistryTests
         public double Extract(uint x, uint y, double amount)
         {
             return 0;
+        }
+
+        public Func<uint, uint, bool>? IsBuildableFilter { get; set; }
+
+        public bool IsBuildable(uint x, uint y)
+        {
+            return IsBuildableFilter?.Invoke(x, y) ?? true;
         }
     }
 
@@ -385,5 +386,119 @@ public class ResidentialBuildingRegistryTests
         // Assert
         Assert.IsAssignableFrom<IReadOnlyCollection<IBuilding>>(all);
         Assert.Single(all);
+    }
+
+    private sealed class FakeExternalBuilding : IBuilding
+    {
+        public EntityId Id { get; } = EntityId.New();
+        public string Name => "External";
+        public BuildingCategory Category => BuildingCategory.Other;
+        public required Position Position { get; init; }
+        public required Footprint Footprint { get; init; }
+        public uint Floors => 1;
+        public uint Capacity => 10;
+        public double Wear => 0;
+    }
+
+    [Theory]
+    [InlineData(-0.5, 5.0, 2u, 2u)]
+    [InlineData(5.0, -10.0, 2u, 2u)]
+    [InlineData(double.NaN, 5.0, 2u, 2u)]
+    [InlineData(double.PositiveInfinity, 5.0, 2u, 2u)]
+    [InlineData(1e20, 5.0, 2u, 2u)]
+    [InlineData(5.0, 5.0, 0u, 2u)]
+    [InlineData(5.0, 5.0, 2u, 0u)]
+    [InlineData(5.0, 5.0, uint.MaxValue, 1u)]
+    public void TryAdd_WithInvalidGeometryOrOverflow_ReturnsFalse(double x, double y, uint width, uint height)
+    {
+        var eventBus = new MockEventBus();
+        var mapService = new MockMapService();
+        var registry = new ResidentialBuildingRegistry(eventBus, mapService);
+
+        var building = new FakeExternalBuilding
+        {
+            Position = new Position(x, y),
+            Footprint = new Footprint(width, height)
+        };
+
+        Assert.False(registry.TryAdd(building));
+        Assert.Empty(registry.All);
+    }
+
+    [Fact]
+    public void TryAdd_WithFractionalCoordinatesCrossingMapEdge_ReturnsFalse()
+    {
+        var eventBus = new MockEventBus();
+        var mapService = new MockMapService(); // 100x100
+        var registry = new ResidentialBuildingRegistry(eventBus, mapService);
+
+        // Занимает [99.5, 100.5) — выходит за границу 100
+        var building = CreateTestBuilding(position: new Position(99.5, 10.0), footprint: new Footprint(1, 1));
+
+        Assert.False(registry.TryAdd(building));
+        Assert.Empty(registry.All);
+    }
+
+    [Fact]
+    public void TryAdd_WithFractionalCoordinatesTouchingUnbuildableCell_ReturnsFalse()
+    {
+        var eventBus = new MockEventBus();
+        var mapService = new MockMapService
+        {
+            // Клетка (12, 10) занята водой / недоступна для строительства
+            IsBuildableFilter = (x, y) => !(x == 12 && y == 10)
+        };
+        var registry = new ResidentialBuildingRegistry(eventBus, mapService);
+
+        // Занимает [10.5, 12.5) × [10, 12) — пересекает клетки 10, 11 и 12
+        var building = CreateTestBuilding(position: new Position(10.5, 10.0), footprint: new Footprint(2, 2));
+
+        Assert.False(registry.TryAdd(building));
+        Assert.Empty(registry.All);
+    }
+
+    [Fact]
+    public void TryAdd_WithFractionalAdjacentBuildings_SucceedsWithoutOverlap()
+    {
+        var eventBus = new MockEventBus();
+        var mapService = new MockMapService();
+        var registry = new ResidentialBuildingRegistry(eventBus, mapService);
+
+        // [10.5, 12.5) и [12.5, 14.5) не пересекаются
+        var b1 = CreateTestBuilding("B1", new Position(10.5, 10.0), new Footprint(2, 2));
+        var b2 = CreateTestBuilding("B2", new Position(12.5, 10.0), new Footprint(2, 2));
+        // [12.0, 14.0) пересекает оба
+        var b3 = CreateTestBuilding("B3", new Position(12.0, 10.0), new Footprint(2, 2));
+
+        Assert.True(registry.TryAdd(b1));
+        Assert.True(registry.TryAdd(b2));
+        Assert.False(registry.TryAdd(b3));
+        Assert.Equal(2, registry.All.Count);
+    }
+
+    [Theory]
+    [InlineData(-1.0)]
+    [InlineData(double.NaN)]
+    public void FindNear_WithInvalidRadius_ThrowsImmediately(double invalidRadius)
+    {
+        var registry = new ResidentialBuildingRegistry(new MockEventBus(), new MockMapService());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            registry.FindNear(new Position(50, 50), invalidRadius));
+    }
+
+    [Fact]
+    public void FindNear_MeasuresDistanceToBuildingFootprint()
+    {
+        var registry = new ResidentialBuildingRegistry(new MockEventBus(), new MockMapService());
+
+        // Угол в (45, 50) — расстояние до угла 5.0, но правая грань в (49, 50) — расстояние 1.0
+        var largeBuilding = CreateTestBuilding("Large", new Position(45, 50), new Footprint(4, 2));
+        registry.TryAdd(largeBuilding);
+
+        var near = registry.FindNear(new Position(50, 50), 2.0).ToList();
+
+        Assert.Single(near);
+        Assert.Equal(largeBuilding.Id, near[0].Id);
     }
 }

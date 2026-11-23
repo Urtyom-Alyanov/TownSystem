@@ -32,6 +32,15 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
         EntityId? id = null)
         : base(name, id)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Название здания не может быть пустым", nameof(name));
+
+        if (!double.IsFinite(position.X) || !double.IsFinite(position.Y) || position.X < 0 || position.Y < 0)
+            throw new ArgumentOutOfRangeException(nameof(position), "Координаты здания должны быть неотрицательными конечными числами");
+
+        if (footprint.Width == 0 || footprint.Height == 0)
+            throw new ArgumentException("Ширина и высота здания должны быть больше 0", nameof(footprint));
+
         if (floors == 0)
             throw new ArgumentException("Количество этажей должно быть больше 0", nameof(floors));
 
@@ -145,6 +154,9 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// <param name="timeDelta">Прошедшее игровое время</param>
     public void AccumulateWear(TimeSpan timeDelta)
     {
+        if (timeDelta < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(timeDelta), "Интервал времени не может быть отрицательным");
+
         // Износ увеличивается с течением времени
         // Формула: 0.00001 за каждый день игрового времени (из расчёта на 100 лет полного износа)
         double dailyWearRate = 0.00001;
@@ -163,6 +175,9 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// <returns>Насколько был снижен износ</returns>
     public double Maintain(MaintenanceType maintenanceType, double cost, DateTime? date = null, string? description = null)
     {
+        if (!double.IsFinite(cost) || cost < 0)
+            throw new ArgumentOutOfRangeException(nameof(cost), "Стоимость обслуживания должна быть неотрицательным конечным числом");
+
         double wearReduction = maintenanceType switch
         {
             MaintenanceType.Inspection => 0.0,          // Осмотр не снижает износ
