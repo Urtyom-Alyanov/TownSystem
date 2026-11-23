@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
+
 using TownSystem.SharedLib.Contracts;
 using TownSystem.SharedLib.Core;
+using TownSystem.SharedLib.Events;
 using TownSystem.SharedLib.Persistence;
 using TownSystem.SharedLib.Simulation;
 
@@ -16,6 +18,7 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
     private PopulationService? populationService;
     private IBuildingRegistry? buildingRegistry;
     private IWorld? world;
+    private IDisposable? buildingRemovedSubscription;
 
     public string Name => "Population";
     public string SaveKey => "population";
@@ -30,11 +33,10 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
 
         this.world = world;
 
-        // Создаем сервис населения
         populationService = new PopulationService();
-
-        // Регистрируем сервис для других модулей
         world.RegisterService<IPopulationService>(populationService);
+
+        buildingRemovedSubscription = world.Events.Subscribe<BuildingRemoved>(OnBuildingRemoved);
     }
 
     /// <summary>
@@ -47,6 +49,12 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
             throw new InvalidOperationException("Initialize должен быть вызван перед OnWorldReady");
 
         buildingRegistry = world.GetService<IBuildingRegistry>();
+        populationService?.SetBuildingRegistry(buildingRegistry);
+    }
+
+    private void OnBuildingRemoved(BuildingRemoved worldEvent)
+    {
+        populationService?.EvictBuildingResidents(worldEvent.BuildingId);
     }
 
     /// <summary>

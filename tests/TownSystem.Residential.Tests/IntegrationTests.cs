@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+
 using TownSystem.Population;
 using TownSystem.Residential;
 using TownSystem.SharedLib.Contracts;
@@ -22,122 +23,63 @@ public class IntegrationTests
         public bool InBounds(uint x, uint y) => x < Width && y < Height;
         public bool IsBuildable(uint x, uint y) => InBounds(x, y);
         public TerrainType GetTerrain(uint x, uint y) => TerrainType.Plain;
-        public ResourceDeposit? GetDeposit(uint x, uint y) => null;
+        public SharedLib.Contracts.ResourceDeposit? GetDeposit(uint x, uint y) => null;
         public double Extract(uint x, uint y, double amount) => 0;
     }
 
-    private class TestEventBus : IEventBus
+    private class ForeignNonResidentialBuilding : IBuilding
     {
-        private readonly List<Action<IWorldEvent>> handlers = new();
-
-        public void Publish(IWorldEvent worldEvent)
-        {
-            foreach (var handler in handlers)
-            {
-                handler(worldEvent);
-            }
-        }
-
-        public IDisposable Subscribe<T>(Action<T> handler) where T : IWorldEvent
-        {
-            var wrappedHandler = (Action<IWorldEvent>)(@event =>
-            {
-                if (@event is T typedEvent)
-                    handler(typedEvent);
-            });
-
-            handlers.Add(wrappedHandler);
-            return new DisposableAction(() => handlers.Remove(wrappedHandler));
-        }
+        public EntityId Id { get; } = EntityId.New();
+        public string Name => "Завод";
+        public BuildingCategory Category => BuildingCategory.Industrial;
+        public Position Position => new(30, 30);
+        public Footprint Footprint => new(3, 3);
+        public uint Floors => 1;
+        public uint Capacity => 50;
+        public double Wear => 0;
     }
 
-    private class DisposableAction : IDisposable
+    private static (World world, ResidentialModule resModule, PopulationModule popModule) CreateRunningSimulation()
     {
-        private readonly Action action;
+        var world = new World();
+        var stubMap = new StubMapModule();
+        var residential = new ResidentialModule();
+        var population = new PopulationModule();
 
-        public DisposableAction(Action action)
-        {
-            this.action = action;
-        }
+        world.RegisterModule(stubMap);
+        world.RegisterModule(residential);
+        world.RegisterModule(population);
+        world.Start();
 
-        public void Dispose() => action();
+        return (world, residential, population);
     }
 
-    private class TestWorld : IWorld
+    private sealed class StubMapModule : ISimulationModule
     {
-        private readonly Dictionary<Type, object> services = new();
-        private readonly TestEventBus eventBus = new();
-
-        public SimulationClock Clock => new SimulationClock();
-        public IEventBus Events => eventBus;
-        public IReadOnlyList<ISimulationModule> Modules => new List<ISimulationModule>();
-
-        public void RegisterService<T>(T service) where T : class
-        {
-            services[typeof(T)] = service;
-        }
-
-        public T GetService<T>() where T : class
-        {
-            if (services.TryGetValue(typeof(T), out var service))
-                return (T)service;
-            throw new InvalidOperationException($"Сервис {typeof(T).Name} не зарегистрирован");
-        }
-
-        public bool TryGetService<T>(out T? service) where T : class
-        {
-            service = null;
-            if (services.TryGetValue(typeof(T), out var svc))
-            {
-                service = (T)svc;
-                return true;
-            }
-            return false;
-        }
+        public string Name => "Map";
+        public int Order => -100;
+        public void Initialize(IWorld world) => world.RegisterService<IMapService>(new TestMapService());
+        public void Tick(TickContext context) { }
     }
 
     [Fact]
     public void Модули_регистрируют_сервисы_корректно()
     {
-        // Подготовка
-        var world = new TestWorld();
-        world.RegisterService<IMapService>(new TestMapService());
+        var (world, _, _) = CreateRunningSimulation();
 
-        var residentialModule = new ResidentialModule();
-        var populationModule = new PopulationModule();
-
-        // Действие
-        residentialModule.Initialize(world);
-        populationModule.Initialize(world);
-
-        // Проверка
         var buildingRegistry = world.GetService<IBuildingRegistry>();
         var populationServiceBase = world.GetService<IPopulationService>();
 
         Assert.NotNull(buildingRegistry);
         Assert.NotNull(populationServiceBase);
-        
-        // Убеждаемся, что это именно PopulationService с полным функционалом
-        var populationService = populationServiceBase as PopulationService;
-        Assert.NotNull(populationService);
+        Assert.IsType<PopulationService>(populationServiceBase);
     }
 
     [Fact]
     public void Граждане_могут_заселяться_в_здания()
     {
-        // Подготовка
-        var world = new TestWorld();
-        world.RegisterService<IMapService>(new TestMapService());
+        var (world, resModule, popModule) = CreateRunningSimulation();
 
-        var residentialModule = new ResidentialModule();
-        var populationModule = new PopulationModule();
-
-        residentialModule.Initialize(world);
-        populationModule.Initialize(world);
-        residentialModule.OnWorldReady();
-        populationModule.OnWorldReady();
-
-        // Создаём здание
         var building = new ResidentialBuilding(
             "Дом 1",
             ResidentialBuildingType.PrivateHouse,
@@ -150,10 +92,8 @@ public class IntegrationTests
         var buildingRegistry = world.GetService<IBuildingRegistry>();
         var populationService = (PopulationService)world.GetService<IPopulationService>();
 
-        var addedBuilding = buildingRegistry.TryAdd(building);
-        Assert.True(addedBuilding);
+        Assert.True(buildingRegistry.TryAdd(building));
 
-        // Создаём семью и граждан
         var citizen1 = new Citizen(EntityId.New(), "Иван", 35, new Position(10, 10));
         var citizen2 = new Citizen(EntityId.New(), "Мария", 32, new Position(10, 10));
 
@@ -163,37 +103,151 @@ public class IntegrationTests
 
         var household = new Household(family, building.Id);
 
-        // Действие
         populationService.RegisterCitizen(citizen1);
         populationService.RegisterCitizen(citizen2);
         populationService.RegisterFamily(family);
-        populationService.RegisterHousehold(household);
+        Assert.True(populationService.RegisterHousehold(household));
 
-        // Проверка
         Assert.Equal(2, populationService.People.Count);
+        Assert.Equal(building.Id, citizen1.HomeId);
+        Assert.Equal(building.Id, citizen2.HomeId);
         Assert.Equal(building.Id, populationService.GetResidence(citizen1.Id));
         Assert.Equal(building.Id, populationService.GetResidence(citizen2.Id));
     }
 
     [Fact]
-    public void Сохранение_и_загрузка_обоих_модулей()
+    public void Заселение_превышающее_вместимость_отклоняется()
     {
-        // Подготовка
-        var world = new TestWorld();
-        world.RegisterService<IMapService>(new TestMapService());
-
-        var residentialModule = new ResidentialModule();
-        var populationModule = new PopulationModule();
-
-        residentialModule.Initialize(world);
-        populationModule.Initialize(world);
-        residentialModule.OnWorldReady();
-        populationModule.OnWorldReady();
-
+        var (world, _, _) = CreateRunningSimulation();
         var buildingRegistry = world.GetService<IBuildingRegistry>();
         var populationService = (PopulationService)world.GetService<IPopulationService>();
 
-        // Добавляем данные
+        // Частный дом на 1 этаж имеет вместимость 4 человека
+        var smallHouse = new ResidentialBuilding(
+            "Коттедж", ResidentialBuildingType.PrivateHouse,
+            new Position(10, 10), new Footprint(2, 2), 1, DateTime.Now
+        );
+        Assert.True(buildingRegistry.TryAdd(smallHouse));
+        Assert.Equal(4u, smallHouse.Capacity);
+
+        // Создаём семью из 5 человек
+        var bigFamily = new Family(EntityId.New(), "БольшаяСемья");
+        for (int i = 0; i < 5; i++)
+        {
+            var citizen = new Citizen(EntityId.New(), $"Член {i}", 20, new Position(0, 0));
+            populationService.RegisterCitizen(citizen);
+            bigFamily.AddMember(citizen);
+        }
+
+        // Попытка заселить 5 человек в дом вместимостью 4 должна быть отклонена
+        Assert.False(populationService.RegisterHousehold(new Household(bigFamily, smallHouse.Id)));
+        Assert.Empty(populationService.Households);
+        Assert.Empty(populationService.GetResidentsOfBuilding(smallHouse.Id));
+    }
+
+    [Fact]
+    public void Переселение_проверяет_вместимость_нового_здания()
+    {
+        var (world, _, _) = CreateRunningSimulation();
+        var buildingRegistry = world.GetService<IBuildingRegistry>();
+        var populationService = (PopulationService)world.GetService<IPopulationService>();
+
+        var houseCapacity8 = new ResidentialBuilding(
+            "Дом 8 мест", ResidentialBuildingType.LowRiseApartment,
+            new Position(10, 10), new Footprint(2, 2), 1, DateTime.Now
+        );
+        var houseCapacity4 = new ResidentialBuilding(
+            "Дом 4 места", ResidentialBuildingType.PrivateHouse,
+            new Position(20, 20), new Footprint(2, 2), 1, DateTime.Now
+        );
+        Assert.True(buildingRegistry.TryAdd(houseCapacity8));
+        Assert.True(buildingRegistry.TryAdd(houseCapacity4));
+
+        var family = new Family(EntityId.New(), "СемьяИз6");
+        for (int i = 0; i < 6; i++)
+        {
+            var citizen = new Citizen(EntityId.New(), $"Член {i}", 20, new Position(0, 0));
+            populationService.RegisterCitizen(citizen);
+            family.AddMember(citizen);
+        }
+
+        Assert.True(populationService.RegisterHousehold(new Household(family, houseCapacity8.Id)));
+
+        // Попытка переселиться в дом на 4 места отклоняется
+        Assert.False(populationService.MoveHousehold(family.Id, houseCapacity4.Id));
+        Assert.Equal(houseCapacity8.Id, family.Members.First().HomeId);
+        Assert.Equal(6, populationService.GetResidentsOfBuilding(houseCapacity8.Id).Count);
+        Assert.Empty(populationService.GetResidentsOfBuilding(houseCapacity4.Id));
+    }
+
+    [Fact]
+    public void Заселение_в_нежилое_или_несуществующее_здание_отклоняется()
+    {
+        var (world, _, _) = CreateRunningSimulation();
+        var buildingRegistry = world.GetService<IBuildingRegistry>();
+        var populationService = (PopulationService)world.GetService<IPopulationService>();
+
+        var factory = new ForeignNonResidentialBuilding();
+        Assert.True(buildingRegistry.TryAdd(factory));
+
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        populationService.RegisterCitizen(citizen);
+        var family = new Family(EntityId.New(), "Семья");
+        family.AddMember(citizen);
+
+        // В промышленное здание заселиться нельзя
+        Assert.False(populationService.RegisterHousehold(new Household(family, factory.Id)));
+
+        // В несуществующее здание заселиться нельзя
+        Assert.False(populationService.RegisterHousehold(new Household(family, EntityId.New())));
+        Assert.Null(citizen.HomeId);
+    }
+
+    [Fact]
+    public void Снос_жилого_здания_автоматически_выселяет_всех_жильцов()
+    {
+        var (world, _, _) = CreateRunningSimulation();
+        var buildingRegistry = world.GetService<IBuildingRegistry>();
+        var populationService = (PopulationService)world.GetService<IPopulationService>();
+
+        var building = new ResidentialBuilding(
+            "Под снос", ResidentialBuildingType.PrivateHouse,
+            new Position(10, 10), new Footprint(2, 2), 1, DateTime.Now
+        );
+        Assert.True(buildingRegistry.TryAdd(building));
+
+        var citizen1 = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var citizen2 = new Citizen(EntityId.New(), "Мария", 28, new Position(0, 0));
+        populationService.RegisterCitizen(citizen1);
+        populationService.RegisterCitizen(citizen2);
+
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen1);
+        family.AddMember(citizen2);
+
+        Assert.True(populationService.RegisterHousehold(new Household(family, building.Id)));
+        Assert.Equal(building.Id, citizen1.HomeId);
+
+        // Действие: сносим здание через IBuildingRegistry
+        Assert.True(buildingRegistry.Remove(building.Id));
+
+        // Проверка: домохозяйство выселено, люди живы, но остались без жилья
+        Assert.Null(buildingRegistry.Find(building.Id));
+        Assert.Empty(populationService.Households);
+        Assert.Null(citizen1.HomeId);
+        Assert.Null(citizen2.HomeId);
+        Assert.Null(populationService.GetResidence(citizen1.Id));
+        Assert.Null(populationService.GetResidence(citizen2.Id));
+        Assert.Equal(2, populationService.People.Count);
+    }
+
+    [Fact]
+    public void Сохранение_и_загрузка_обоих_модулей()
+    {
+        var (world, _, _) = CreateRunningSimulation();
+        var buildingRegistry = world.GetService<IBuildingRegistry>();
+        var populationService = (PopulationService)world.GetService<IPopulationService>();
+
         var building = new ResidentialBuilding(
             "Многоквартирный дом",
             ResidentialBuildingType.MidRiseApartment,
@@ -203,7 +257,7 @@ public class IntegrationTests
             new DateTime(2010, 1, 1)
         );
 
-        buildingRegistry.TryAdd(building);
+        Assert.True(buildingRegistry.TryAdd(building));
 
         var citizen = new Citizen(EntityId.New(), "Петр", 40, new Position(5, 5));
         var family = new Family(EntityId.New(), "Сидоровы");
@@ -212,32 +266,19 @@ public class IntegrationTests
 
         populationService.RegisterCitizen(citizen);
         populationService.RegisterFamily(family);
-        populationService.RegisterHousehold(household);
+        Assert.True(populationService.RegisterHousehold(household));
 
-        // Сохраняем
-        var residentialSaved = residentialModule.Save();
-        var populationSaved = populationModule.Save();
+        var residentialSaved = world.Modules.OfType<ResidentialModule>().First().Save();
+        var populationSaved = world.Modules.OfType<PopulationModule>().First().Save();
 
-        // Создаём новые модули и загружаем
-        var world2 = new TestWorld();
-        world2.RegisterService<IMapService>(new TestMapService());
+        var (world2, resModule2, popModule2) = CreateRunningSimulation();
 
-        var residentialModule2 = new ResidentialModule();
-        var populationModule2 = new PopulationModule();
-
-        residentialModule2.Initialize(world2);
-        populationModule2.Initialize(world2);
-        residentialModule2.OnWorldReady();
-        populationModule2.OnWorldReady();
-
-        // Загружаем
-        residentialModule2.Load(residentialSaved);
-        populationModule2.Load(populationSaved);
+        resModule2.Load(residentialSaved);
+        popModule2.Load(populationSaved);
 
         var buildingRegistry2 = world2.GetService<IBuildingRegistry>();
         var populationService2 = (PopulationService)world2.GetService<IPopulationService>();
 
-        // Проверка
         var loadedBuilding = buildingRegistry2.Find(building.Id);
         Assert.NotNull(loadedBuilding);
         Assert.Equal("Многоквартирный дом", loadedBuilding.Name);
@@ -245,30 +286,21 @@ public class IntegrationTests
         var loadedCitizen = populationService2.FindCitizen(citizen.Id);
         Assert.NotNull(loadedCitizen);
         Assert.Equal("Петр", loadedCitizen.Name);
+        Assert.Equal(building.Id, loadedCitizen.HomeId);
         Assert.Equal(building.Id, populationService2.GetResidence(citizen.Id));
     }
 
     [Fact]
     public void Модули_правильно_обрабатывают_пустые_данные()
     {
-        // Подготовка
-        var world = new TestWorld();
-        world.RegisterService<IMapService>(new TestMapService());
+        var (world, resModule, popModule) = CreateRunningSimulation();
 
-        var residentialModule = new ResidentialModule();
-        var populationModule = new PopulationModule();
+        var residentialEmpty = resModule.Save();
+        var populationEmpty = popModule.Save();
 
-        residentialModule.Initialize(world);
-        populationModule.Initialize(world);
+        resModule.Load(residentialEmpty);
+        popModule.Load(populationEmpty);
 
-        // Действие - пусто сохраняем и загружаем
-        var residentialEmpty = residentialModule.Save();
-        var populationEmpty = populationModule.Save();
-
-        residentialModule.Load(residentialEmpty);
-        populationModule.Load(populationEmpty);
-
-        // Проверка - всё должно работать без ошибок
         var buildingRegistry = world.GetService<IBuildingRegistry>();
         var populationService = (PopulationService)world.GetService<IPopulationService>();
 
@@ -279,22 +311,10 @@ public class IntegrationTests
     [Fact]
     public void Множество_зданий_и_граждан_работают_вместе()
     {
-        // Подготовка
-        var world = new TestWorld();
-        world.RegisterService<IMapService>(new TestMapService());
-
-        var residentialModule = new ResidentialModule();
-        var populationModule = new PopulationModule();
-
-        residentialModule.Initialize(world);
-        populationModule.Initialize(world);
-        residentialModule.OnWorldReady();
-        populationModule.OnWorldReady();
-
+        var (world, _, _) = CreateRunningSimulation();
         var buildingRegistry = world.GetService<IBuildingRegistry>();
         var populationService = (PopulationService)world.GetService<IPopulationService>();
 
-        // Создаём 3 здания
         var buildings = new List<ResidentialBuilding>();
         for (uint i = 0; i < 3; i++)
         {
@@ -308,11 +328,10 @@ public class IntegrationTests
                 1,
                 DateTime.Now
             );
-            buildingRegistry.TryAdd(building);
+            Assert.True(buildingRegistry.TryAdd(building));
             buildings.Add(building);
         }
 
-        // Создаём 3 семьи по 2 человека
         for (uint i = 0; i < 3; i++)
         {
             uint posX = 10 + i * 5;
@@ -329,14 +348,12 @@ public class IntegrationTests
             populationService.RegisterCitizen(citizen1);
             populationService.RegisterCitizen(citizen2);
             populationService.RegisterFamily(family);
-            populationService.RegisterHousehold(household);
+            Assert.True(populationService.RegisterHousehold(household));
         }
 
-        // Проверка
         Assert.Equal(3, buildingRegistry.All.Count);
         Assert.Equal(6, populationService.People.Count);
 
-        // Проверяем что каждый гражданин живёт в соответствующем доме
         var residentsOfHouse0 = populationService.GetResidentsOfBuilding(buildings[0].Id);
         Assert.Equal(2, residentsOfHouse0.Count);
     }

@@ -196,6 +196,17 @@ public sealed class PopulationService : IPopulationService
             if (residenceMap.ContainsKey(citizen.Id) || citizen.HomeId != null)
                 return false;
 
+            if (buildingRegistry != null)
+            {
+                var building = buildingRegistry.Find(household.BuildingId);
+                if (building == null || building.Category != BuildingCategory.Residential)
+                    return false;
+
+                int currentResidentsCount = GetResidentsOfBuilding(household.BuildingId).Count;
+                if (currentResidentsCount + 1 > building.Capacity)
+                    return false;
+            }
+
             family.AddMemberInternal(citizen);
             residenceMap[citizen.Id] = household.BuildingId;
             citizen.HomeId = household.BuildingId;
@@ -259,6 +270,18 @@ public sealed class PopulationService : IPopulationService
         if (familyAlreadyRegistered && !ReferenceEquals(existingFamily, family))
             return false;
 
+        // Проверяем само здание и его вместимость через реестр
+        if (buildingRegistry != null)
+        {
+            var building = buildingRegistry.Find(household.BuildingId);
+            if (building == null || building.Category != BuildingCategory.Residential)
+                return false;
+
+            int currentResidentsCount = GetResidentsOfBuilding(household.BuildingId).Count;
+            if (currentResidentsCount + family.MemberCount > building.Capacity)
+                return false;
+        }
+
         // Проверяем всех участников до внесения любых изменений
         foreach (var member in family.Members)
         {
@@ -310,6 +333,24 @@ public sealed class PopulationService : IPopulationService
                 return false;
         }
 
+        if (buildingRegistry != null)
+        {
+            var targetBuilding = buildingRegistry.Find(newBuildingId);
+            if (targetBuilding == null || targetBuilding.Category != BuildingCategory.Residential)
+                return false;
+
+            // Считаем занятые места в целевом доме (без учёта текущей семьи, если она уже там живёт)
+            int occupiedPlaces = 0;
+            foreach (var kvp in residenceMap)
+            {
+                if (kvp.Value == newBuildingId && !household.Family.Members.Any(m => m.Id == kvp.Key))
+                    occupiedPlaces++;
+            }
+
+            if (occupiedPlaces + household.Family.MemberCount > targetBuilding.Capacity)
+                return false;
+        }
+
         household.BuildingId = newBuildingId;
 
         foreach (var member in household.Family.Members)
@@ -319,6 +360,13 @@ public sealed class PopulationService : IPopulationService
         }
 
         return true;
+    }
+
+    private IBuildingRegistry? buildingRegistry;
+
+    internal void SetBuildingRegistry(IBuildingRegistry registry)
+    {
+        buildingRegistry = registry;
     }
 
     /// <summary>
@@ -386,6 +434,7 @@ public sealed class PopulationService : IPopulationService
         familiesDictionary.Clear();
         householdsDictionary.Clear();
         residenceMap.Clear();
+        buildingRegistry = null;
     }
 
     private bool IsRegisteredCitizenInstance(Citizen citizen)
@@ -422,5 +471,25 @@ public sealed class PopulationService : IPopulationService
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Выселяет все домохозяйства из указанного здания (вызывается при сносе здания).
+    /// Граждане и семьи остаются в городе, но сбрасывают место жительства.
+    /// </summary>
+    internal void EvictBuildingResidents(EntityId buildingId)
+    {
+        if (buildingId == default)
+            return;
+
+        var affectedFamilies = householdsDictionary.Values
+            .Where(h => h.BuildingId == buildingId)
+            .Select(h => h.Family.Id)
+            .ToList();
+
+        foreach (var familyId in affectedFamilies)
+        {
+            UnregisterHousehold(familyId);
+        }
     }
 }
