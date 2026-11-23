@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 
 using TownSystem.SharedLib.Contracts;
 using TownSystem.SharedLib.Core;
+using TownSystem.SharedLib.Events;
 using TownSystem.SharedLib.Persistence;
 using TownSystem.SharedLib.Simulation;
 
@@ -16,6 +17,7 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     private ResidentialBuildingRegistry? registry;
     private IWorld? world;
     private IMapService? mapService;
+    private IDisposable? emergencySubscription;
 
     public string Name => "Residential";
     public string SaveKey => "residential";
@@ -33,6 +35,8 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
         // Создаем реестр и публикуем его сразу, а карту подключим в OnWorldReady
         registry = new ResidentialBuildingRegistry(world.Events);
         world.RegisterService<IBuildingRegistry>(registry);
+
+        emergencySubscription = world.Events.Subscribe<EmergencyReported>(OnEmergencyReported);
     }
 
     /// <summary>
@@ -207,4 +211,30 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// Получает реестр для прямого доступа (внутреннее использование).
     /// </summary>
     internal ResidentialBuildingRegistry? GetRegistry() => registry;
+
+    private void OnEmergencyReported(EmergencyReported worldEvent)
+    {
+        if (registry == null)
+            return;
+
+        if (worldEvent.Kind is not (EmergencyKind.Fire or EmergencyKind.Accident or EmergencyKind.NaturalDisaster or EmergencyKind.Breakdown))
+            return;
+
+        double damage = worldEvent.Severity * 0.05; // 1-5 тяжесть -> 0.05 - 0.25 к износу
+
+        // Если указано конкретное здание
+        if (worldEvent.SubjectId.HasValue)
+        {
+            if (registry.Find(worldEvent.SubjectId.Value) is ResidentialBuilding target)
+                target.ApplyDamage(damage);
+            return;
+        }
+
+        // Если указана точка на карте, повреждаем жилые здания в радиусе происшествия
+        double impactRadius = worldEvent.Severity * 2.0;
+        foreach (var building in registry.FindNear(worldEvent.Location, impactRadius).OfType<ResidentialBuilding>())
+        {
+            building.ApplyDamage(damage);
+        }
+    }
 }

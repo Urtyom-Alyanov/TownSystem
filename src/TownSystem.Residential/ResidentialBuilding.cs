@@ -234,4 +234,28 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     {
         get => maintenanceHistory.Sum(r => r.Cost);
     }
+
+    /// <summary>
+    /// Возраст здания в годах относительно симуляционного времени.
+    /// </summary>
+    public int GetAgeInYears(DateTime simTime)
+    {
+        int age = simTime.Year - ConstructionDate.Year;
+        if (simTime < ConstructionDate.AddYears(age))
+            age--;
+
+        return Math.Max(0, age);
+    }
+
+    /// <summary>
+    /// Наносит зданию повреждения (увеличивает износ), например в результате происшествия.
+    /// </summary>
+    /// <param name="damage">Размер повреждения от 0 до 1</param>
+    public void ApplyDamage(double damage)
+    {
+        if (!double.IsFinite(damage) || damage <= 0)
+            return;
+
+        Wear += damage;
+    }
 }

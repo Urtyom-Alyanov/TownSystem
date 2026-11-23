@@ -57,14 +57,61 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
         populationService?.EvictBuildingResidents(worldEvent.BuildingId);
     }
 
+    private double accumulatedDaysForAging;
+
     /// <summary>
     /// Выполняет один такт симуляции.
-    /// Обновляет состояние населения (не требуется в базовой версии).
+    /// Старение граждан, динамика здоровья и пересчёт удовлетворённости жильём.
     /// </summary>
     public void Tick(TickContext context)
     {
-        // В базовой версии Etap 4 нет специальной логики на такт
-        // Это может быть расширено в будущих этапах
+        if (populationService == null)
+            return;
+
+        accumulatedDaysForAging += context.Delta.TotalDays;
+
+        // 1. Старение граждан каждые 365 игровых дней
+        if (accumulatedDaysForAging >= 365.0)
+        {
+            uint yearsToAdd = (uint)(accumulatedDaysForAging / 365.0);
+            accumulatedDaysForAging %= 365.0;
+
+            foreach (var person in populationService.People.OfType<Citizen>())
+            {
+                person.Age += yearsToAdd;
+            }
+        }
+
+        // 2. Расчёт удовлетворённости жильём и влияние аварийного состояния на здоровье
+        foreach (var household in populationService.Households)
+        {
+            IBuilding? building = buildingRegistry?.Find(household.BuildingId);
+            if (building == null)
+                continue;
+
+            double conditionScore = Math.Clamp(1.0 - building.Wear, 0.0, 1.0);
+
+            // Штраф за тесноту: если комнат меньше минимальной нормы
+            double roomRatio = 1.0;
+            if (building.Floors > 0 && household.Family.MinimalRoomCount > 0)
+            {
+                uint estimatedRooms = building.Floors * 2;
+                if (estimatedRooms < household.Family.MinimalRoomCount)
+                    roomRatio = (double)estimatedRooms / household.Family.MinimalRoomCount;
+            }
+
+            household.Satisfaction = Math.Clamp(conditionScore * 0.7 + roomRatio * 0.3, 0.0, 1.0);
+
+            // Если дом критически изношен (Wear >= 0.8), здоровье жильцов ухудшается
+            if (building.Wear >= 0.8)
+            {
+                double healthLoss = 0.001 * context.Delta.TotalDays * (building.Wear - 0.7);
+                foreach (var member in household.Family.Members)
+                {
+                    member.Health = Math.Max(0.05, member.Health - healthLoss);
+                }
+            }
+        }
     }
 
     /// <summary>

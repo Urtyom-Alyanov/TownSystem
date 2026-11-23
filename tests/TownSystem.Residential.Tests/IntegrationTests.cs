@@ -357,4 +357,63 @@ public class IntegrationTests
         var residentsOfHouse0 = populationService.GetResidentsOfBuilding(buildings[0].Id);
         Assert.Equal(2, residentsOfHouse0.Count);
     }
+
+    [Fact]
+    public void Бедствие_наносит_урон_жилому_зданию()
+    {
+        var (world, _, _) = CreateRunningSimulation();
+        var buildingRegistry = world.GetService<IBuildingRegistry>();
+
+        var house = new ResidentialBuilding(
+            "Дом уязвимый", ResidentialBuildingType.PrivateHouse,
+            new Position(10, 10), new Footprint(2, 2), 1, DateTime.Now
+        );
+        buildingRegistry.TryAdd(house);
+
+        double wearBefore = house.Wear;
+
+        // Публикуем пожар тяжести 4 в этом здании
+        world.Events.Publish(new EmergencyReported(
+            Guid.NewGuid(), EmergencyKind.Fire, house.Position, Severity: 4, SubjectId: house.Id));
+
+        Assert.True(house.Wear > wearBefore);
+        Assert.Equal(wearBefore + 0.20, house.Wear, precision: 5);
+    }
+
+    [Fact]
+    public void Такт_симуляции_пересчитывает_удовлетворенность_и_старит_граждан()
+    {
+        var (world, _, _) = CreateRunningSimulation();
+        var buildingRegistry = world.GetService<IBuildingRegistry>();
+        var populationService = (PopulationService)world.GetService<IPopulationService>();
+
+        var house = new ResidentialBuilding(
+            "Стареющий дом", ResidentialBuildingType.PrivateHouse,
+            new Position(10, 10), new Footprint(2, 2), 1, new DateTime(2020, 1, 1)
+        );
+        buildingRegistry.TryAdd(house);
+
+        var citizen = new Citizen(EntityId.New(), "Иван", 25, new Position(10, 10));
+        populationService.RegisterCitizen(citizen);
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen);
+        var household = new Household(family, house.Id);
+        populationService.RegisterHousehold(household);
+
+        // Наносим дому высокий износ, чтобы вызвать недовольство и падение здоровья
+        house.ApplyDamage(0.85);
+
+        // Устанавливаем скорость симуляции 1 к 1, чтобы Advance не умножал дни на 60
+        world.Clock.SetSpeed(1);
+
+        // Прогоняем 365 игровых дней (ровно 1 игровой год)
+        world.Update(TimeSpan.FromDays(365));
+
+        // Гражданин постарел ровно на 1 год (с 25 до 26)
+        Assert.Equal(26u, citizen.Age);
+        // Удовлетворённость жильём упала из-за высокого износа
+        Assert.True(household.Satisfaction < 0.5);
+        // Здоровье в аварийном доме снизилось
+        Assert.True(citizen.Health < 1.0);
+    }
 }
