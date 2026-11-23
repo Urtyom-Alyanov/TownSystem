@@ -159,8 +159,9 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// <param name="maintenanceType">Тип обслуживания</param>
     /// <param name="cost">Стоимость обслуживания</param>
     /// <param name="date">Дата проведения (опционально, по умолчанию DateTime.Now)</param>
+    /// <param name="description">Описание работ (опционально)</param>
     /// <returns>Насколько был снижен износ</returns>
-    public double Maintain(MaintenanceType maintenanceType, double cost, DateTime? date = null)
+    public double Maintain(MaintenanceType maintenanceType, double cost, DateTime? date = null, string? description = null)
     {
         double wearReduction = maintenanceType switch
         {
@@ -179,10 +180,27 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
             maintenanceType,
             cost,
             wearReduction
-        );
+        )
+        {
+            Description = description
+        };
         maintenanceHistory.Add(record);
 
         return oldWear - Wear;
+    }
+
+    /// <summary>
+    /// Восстанавливает износ и историю обслуживания при загрузке сохранения без повторного применения эффектов ремонта.
+    /// </summary>
+    internal void RestoreState(double savedWear, IEnumerable<MaintenanceRecord> savedHistory)
+    {
+        ArgumentNullException.ThrowIfNull(savedHistory);
+        if (!double.IsFinite(savedWear))
+            throw new ArgumentOutOfRangeException(nameof(savedWear), "Износ должен быть конечным числом");
+
+        Wear = savedWear;
+        maintenanceHistory.Clear();
+        maintenanceHistory.AddRange(savedHistory);
     }
 
     /// <summary>

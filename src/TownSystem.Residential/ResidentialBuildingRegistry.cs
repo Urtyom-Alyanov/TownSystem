@@ -43,6 +43,33 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     }
 
     /// <summary>
+    /// Заменяет жилые здания в реестре при загрузке сохранения
+    /// без удаления зданий других модулей и без публикации событий.
+    /// </summary>
+    internal void ReplaceResidentialBuildings(IEnumerable<ResidentialBuilding> loadedBuildings)
+    {
+        ArgumentNullException.ThrowIfNull(loadedBuildings);
+
+        var residentialIds = buildings
+            .Where(kvp => kvp.Value is ResidentialBuilding)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        foreach (var id in residentialIds)
+        {
+            buildings.Remove(id);
+        }
+
+        foreach (var building in loadedBuildings)
+        {
+            if (building == null)
+                continue;
+
+            buildings[building.Id] = building;
+        }
+    }
+
+    /// <summary>
     /// Все зарегистрированные здания.
     /// </summary>
     public IReadOnlyCollection<IBuilding> All => buildings.Values;

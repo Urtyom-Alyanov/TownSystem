@@ -1,8 +1,7 @@
-using System.Text.Json;
 using System.Text.Json.Nodes;
+
 using TownSystem.SharedLib.Contracts;
 using TownSystem.SharedLib.Core;
-using TownSystem.SharedLib.Events;
 using TownSystem.SharedLib.Persistence;
 using TownSystem.SharedLib.Simulation;
 
@@ -101,7 +100,7 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
                     ["type"] = record.Type.ToString(),
                     ["cost"] = record.Cost,
                     ["wearReduction"] = record.WearReduction,
-                    ["description"] = record.Description ?? ""
+                    ["description"] = record.Description
                 };
                 maintenanceArray.Add(recordObj);
             }
@@ -119,20 +118,14 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public void Load(JsonNode state)
     {
-        if (registry == null || mapService == null || world == null)
+        if (registry == null)
             return;
 
         if (state?["buildings"] is not JsonArray buildingsArray)
             return;
 
-        // Очищаем текущий реестр
-        var existingIds = registry.All.Select(b => b.Id).ToList();
-        foreach (var id in existingIds)
-        {
-            registry.Remove(id);
-        }
+        var loadedBuildings = new List<ResidentialBuilding>();
 
-        // Восстанавливаем здания
         foreach (var buildingNode in buildingsArray.OfType<JsonObject>())
         {
             try
@@ -158,13 +151,7 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
                     id
                 );
 
-                // Восстанавливаем износ
-                while (building.Wear < wear)
-                {
-                    building.AccumulateWear(TimeSpan.FromDays(1));
-                }
-
-                // Восстанавливаем историю обслуживания
+                var history = new List<MaintenanceRecord>();
                 if (buildingNode["maintenanceHistory"] is JsonArray maintenanceArray)
                 {
                     foreach (var recordNode in maintenanceArray.OfType<JsonObject>())
@@ -173,21 +160,25 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
                         var type = Enum.Parse<MaintenanceType>(recordNode["type"]!.GetValue<string>());
                         var cost = recordNode["cost"]!.GetValue<double>();
                         var wearReduction = recordNode["wearReduction"]!.GetValue<double>();
-                        var description = recordNode["description"]!.GetValue<string>();
+                        var description = recordNode["description"]?.GetValue<string>();
 
-                        building.Maintain(type, cost, date);
+                        history.Add(new MaintenanceRecord(date, type, cost, wearReduction)
+                        {
+                            Description = description
+                        });
                     }
                 }
 
-                // Добавляем в реестр
-                registry.TryAdd(building);
+                building.RestoreState(wear, history);
+                loadedBuildings.Add(building);
             }
             catch (Exception ex)
             {
-                // Логируем ошибку, но продолжаем загрузку
                 System.Diagnostics.Debug.WriteLine($"Ошибка при загрузке здания: {ex.Message}");
             }
         }
+
+        registry.ReplaceResidentialBuildings(loadedBuildings);
     }
 
     /// <summary>
