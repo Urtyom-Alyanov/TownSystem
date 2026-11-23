@@ -86,6 +86,12 @@ public class Family
         RemoveMemberInternal(citizen);
     }
 
+    internal void ClearMembersInternal()
+    {
+        members.Clear();
+    }
+
+
     /// <summary>
     /// Проверяет, есть ли член в семье.
     /// </summary>

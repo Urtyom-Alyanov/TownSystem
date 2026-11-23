@@ -99,15 +99,30 @@ public sealed class PopulationService : IPopulationService
 
     /// <summary>
     /// Удаляет горожанина из города (смерть, эмиграция).
+    /// Удаляет его из peopleDictionary, residenceMap и состава семьи;
+    /// если семья была заселена и осталась без участников, удаляет пустое домохозяйство.
     /// </summary>
     /// <param name="citizenId">ID горожанина</param>
     /// <returns>true если успешно удалён</returns>
     public bool UnregisterCitizen(EntityId citizenId)
     {
-        if (!peopleDictionary.Remove(citizenId))
+        if (!peopleDictionary.Remove(citizenId, out var citizen))
             return false;
 
         residenceMap.Remove(citizenId);
+        citizen.HomeId = null;
+
+        foreach (var family in familiesDictionary.Values)
+        {
+            if (family.RemoveMemberInternal(citizen))
+            {
+                if (family.MemberCount == 0)
+                    UnregisterHousehold(family.Id);
+
+                break;
+            }
+        }
+
         return true;
     }
 
@@ -133,6 +148,25 @@ public sealed class PopulationService : IPopulationService
 
         familiesDictionary[family.Id] = family;
         family.AttachToService(this);
+        return true;
+    }
+
+    /// <summary>
+    /// Удаляет семью из сервиса без удаления самих граждан из города.
+    /// Связанное домохозяйство (если оно было) расформировывается, у жильцов сбрасывается место проживания.
+    /// </summary>
+    /// <param name="familyId">ID семьи</param>
+    /// <returns>true если семья найдена и удалена; false если семья не найдена</returns>
+    public bool UnregisterFamily(EntityId familyId)
+    {
+        if (!familiesDictionary.TryGetValue(familyId, out var family))
+            return false;
+
+        UnregisterHousehold(familyId);
+
+        familiesDictionary.Remove(familyId);
+        family.ClearMembersInternal();
+        family.DetachFromService();
         return true;
     }
 
@@ -174,6 +208,7 @@ public sealed class PopulationService : IPopulationService
 
     /// <summary>
     /// Удаляет гражданина из зарегистрированной семьи и сбрасывает его проживание, если семья заселена.
+    /// Если у заселённой семьи не остаётся членов, пустое домохозяйство расформировывается.
     /// </summary>
     public bool RemoveMemberFromFamily(EntityId familyId, EntityId citizenId)
     {
@@ -190,6 +225,9 @@ public sealed class PopulationService : IPopulationService
         {
             residenceMap.Remove(citizenId);
             member.HomeId = null;
+
+            if (family.MemberCount == 0)
+                UnregisterHousehold(familyId);
         }
 
         return true;

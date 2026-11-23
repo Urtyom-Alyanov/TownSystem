@@ -611,5 +611,111 @@ public class PopulationModelsTests
         Assert.Throws<ArgumentException>(() => new Household(family, default));
     }
 
+    [Fact]
+    public void PopulationService_UnregisterCitizen_RemovesFromFamilyAndAllowsMoveForSurvivors()
+    {
+        var service = new PopulationService();
+        var citizen1 = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var citizen2 = new Citizen(EntityId.New(), "Мария", 28, new Position(0, 0));
+        service.RegisterCitizen(citizen1);
+        service.RegisterCitizen(citizen2);
+
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen1);
+        family.AddMember(citizen2);
+
+        var building1 = EntityId.New();
+        var building2 = EntityId.New();
+        Assert.True(service.RegisterHousehold(new Household(family, building1)));
+
+        // Удаляем первого гражданина
+        Assert.True(service.UnregisterCitizen(citizen1.Id));
+        Assert.False(service.UnregisterCitizen(citizen1.Id)); // повторное удаление
+
+        // Связи очищены
+        Assert.Null(citizen1.HomeId);
+        Assert.Null(service.GetResidence(citizen1.Id));
+        Assert.False(family.HasMember(citizen1));
+        Assert.Single(family.Members);
+        Assert.Single(service.Households);
+
+        // Оставшийся член семьи может нормально переселиться в другое здание
+        Assert.True(service.MoveHousehold(family.Id, building2));
+        Assert.Equal(building2, citizen2.HomeId);
+        Assert.Single(service.GetResidentsOfBuilding(building2));
+        Assert.Empty(service.GetResidentsOfBuilding(building1));
+    }
+
+    [Fact]
+    public void PopulationService_UnregisterCitizen_LastMemberRemovesEmptyHousehold()
+    {
+        var service = new PopulationService();
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        service.RegisterCitizen(citizen);
+
+        var family = new Family(EntityId.New(), "Одиночка");
+        family.AddMember(citizen);
+
+        var buildingId = EntityId.New();
+        Assert.True(service.RegisterHousehold(new Household(family, buildingId)));
+
+        Assert.True(service.UnregisterCitizen(citizen.Id));
+
+        Assert.Empty(family.Members);
+        Assert.Empty(service.Households);
+        Assert.Empty(service.GetResidentsOfBuilding(buildingId));
+        Assert.Single(service.Families); // сама семья не удаляется скрытым каскадом
+    }
+
+    [Fact]
+    public void PopulationService_UnregisterFamily_RemovesHouseholdButKeepsCitizens()
+    {
+        var service = new PopulationService();
+        var citizen1 = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var citizen2 = new Citizen(EntityId.New(), "Мария", 28, new Position(0, 0));
+        service.RegisterCitizen(citizen1);
+        service.RegisterCitizen(citizen2);
+
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen1);
+        family.AddMember(citizen2);
+
+        var buildingId = EntityId.New();
+        Assert.True(service.RegisterHousehold(new Household(family, buildingId)));
+
+        // Удаляем семью
+        Assert.True(service.UnregisterFamily(family.Id));
+
+        // Семья и домохозяйство удалены, но живые граждане остались в городе
+        Assert.Empty(service.Families);
+        Assert.Empty(service.Households);
+        Assert.Null(service.FindFamily(family.Id));
+        Assert.Null(service.FindHousehold(family.Id));
+        Assert.Empty(family.Members);
+
+        Assert.Equal(2, service.People.Count);
+        Assert.Null(citizen1.HomeId);
+        Assert.Null(citizen2.HomeId);
+        Assert.Null(service.GetResidence(citizen1.Id));
+        Assert.Null(service.GetResidence(citizen2.Id));
+        Assert.Empty(service.GetResidentsOfBuilding(buildingId));
+
+        // Повторное удаление безопасно
+        Assert.False(service.UnregisterFamily(family.Id));
+
+        // Граждане могут вступить в новую семью и заселиться снова
+        var newFamily = new Family(EntityId.New(), "Новые");
+        newFamily.AddMember(citizen1);
+        Assert.True(service.RegisterFamily(newFamily));
+    }
+
+    [Fact]
+    public void PopulationService_UnregisterFamily_NonExistent_ReturnsFalse()
+    {
+        var service = new PopulationService();
+
+        Assert.False(service.UnregisterFamily(EntityId.New()));
+    }
+
     #endregion
 }
