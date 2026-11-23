@@ -10,9 +10,9 @@ namespace TownSystem.Residential;
 /// </summary>
 public sealed class ResidentialBuildingRegistry : IBuildingRegistry
 {
-    private readonly Dictionary<EntityId, IBuilding> _buildings;
-    private readonly IEventBus _eventBus;
-    private readonly IMapService _mapService;
+    private readonly Dictionary<EntityId, IBuilding> buildings;
+    private readonly IEventBus eventBus;
+    private readonly IMapService mapService;
 
     /// <summary>
     /// Создаёт новый реестр зданий.
@@ -21,15 +21,15 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <param name="mapService">Сервис карты для проверки допустимости местности</param>
     public ResidentialBuildingRegistry(IEventBus eventBus, IMapService mapService)
     {
-        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-        _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
-        _buildings = new Dictionary<EntityId, IBuilding>();
+        this.eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        this.mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
+        buildings = new Dictionary<EntityId, IBuilding>();
     }
 
     /// <summary>
     /// Все зарегистрированные здания.
     /// </summary>
-    public IReadOnlyCollection<IBuilding> All => _buildings.Values;
+    public IReadOnlyCollection<IBuilding> All => buildings.Values;
 
     /// <summary>
     /// Добавляет здание в реестр с проверками корректности.
@@ -47,7 +47,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
             throw new ArgumentNullException(nameof(building));
 
         // Проверка, что здание еще не добавлено
-        if (_buildings.ContainsKey(building.Id))
+        if (buildings.ContainsKey(building.Id))
             return false;
 
         // Проверка выхода за границы карты
@@ -63,8 +63,8 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
             return false;
 
         // Все проверки пройдены
-        _buildings[building.Id] = building;
-        _eventBus.Publish(new BuildingAdded(building.Id));
+        buildings[building.Id] = building;
+        eventBus.Publish(new BuildingAdded(building.Id));
         return true;
     }
 
@@ -76,10 +76,10 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <returns>true, если здание удалено; false, если здание не найдено</returns>
     public bool Remove(EntityId id)
     {
-        if (!_buildings.Remove(id))
+        if (!buildings.Remove(id))
             return false;
 
-        _eventBus.Publish(new BuildingRemoved(id));
+        eventBus.Publish(new BuildingRemoved(id));
         return true;
     }
 
@@ -90,7 +90,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <returns>Здание или null, если не найдено</returns>
     public IBuilding? Find(EntityId id)
     {
-        return _buildings.TryGetValue(id, out var building) ? building : null;
+        return buildings.TryGetValue(id, out var building) ? building : null;
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <returns>Перечисление зданий в радиусе</returns>
     public IEnumerable<IBuilding> FindNear(Position center, double radius)
     {
-        return _buildings.Values.Where(b =>
+        return buildings.Values.Where(b =>
             center.DistanceTo(b.Position) <= radius
         );
     }
@@ -117,10 +117,10 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         var maxY = minY + building.Footprint.Height - 1;
 
         // Проверяем границы карты для всех углов
-        if (!_mapService.InBounds(minX, minY))
+        if (!mapService.InBounds(minX, minY))
             return false;
 
-        if (!_mapService.InBounds(maxX, maxY))
+        if (!mapService.InBounds(maxX, maxY))
             return false;
 
         return true;
@@ -140,7 +140,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         {
             for (uint y = minY; y <= maxY; y++)
             {
-                if (!_mapService.IsBuildable(x, y))
+                if (!mapService.IsBuildable(x, y))
                     return false;
             }
         }
@@ -158,7 +158,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         var newMaxX = newMinX + building.Footprint.Width;
         var newMaxY = newMinY + building.Footprint.Height;
 
-        foreach (var existing in _buildings.Values)
+        foreach (var existing in buildings.Values)
         {
             var existMinX = existing.Position.X;
             var existMinY = existing.Position.Y;

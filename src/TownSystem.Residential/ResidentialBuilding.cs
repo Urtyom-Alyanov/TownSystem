@@ -9,8 +9,8 @@ namespace TownSystem.Residential;
 /// </summary>
 public sealed class ResidentialBuilding : EntityBase, IBuilding
 {
-    private double _wear;
-    private readonly List<MaintenanceRecord> _maintenanceHistory;
+    private double wear;
+    private readonly List<MaintenanceRecord> maintenanceHistory;
 
     /// <summary>
     /// Создаёт новое жилое здание.
@@ -40,8 +40,8 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
         Footprint = footprint;
         Floors = floors;
         ConstructionDate = constructionDate;
-        _wear = 0.0;
-        _maintenanceHistory = new List<MaintenanceRecord>();
+        wear = 0.0;
+        maintenanceHistory = new List<MaintenanceRecord>();
     }
 
     /// <summary>
@@ -72,7 +72,7 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// <summary>
     /// История обслуживания здания.
     /// </summary>
-    public IReadOnlyList<MaintenanceRecord> MaintenanceHistory => _maintenanceHistory.AsReadOnly();
+    public IReadOnlyList<MaintenanceRecord> MaintenanceHistory => maintenanceHistory.AsReadOnly();
 
     // IBuilding implementation
 
@@ -110,8 +110,8 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// </summary>
     public double Wear
     {
-        get => _wear;
-        private set => _wear = Math.Clamp(value, 0.0, 1.0);
+        get => wear;
+        private set => wear = Math.Clamp(value, 0.0, 1.0);
     }
 
     /// <summary>
@@ -180,7 +180,7 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
             cost,
             wearReduction
         );
-        _maintenanceHistory.Add(record);
+        maintenanceHistory.Add(record);
 
         return oldWear - Wear;
     }
@@ -191,7 +191,7 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// <returns>Дата последнего обслуживания или null, если обслуживания не было</returns>
     public DateTime? LastMaintenanceDate
     {
-        get => _maintenanceHistory.Count > 0 ? _maintenanceHistory[^1].Date : null;
+        get => maintenanceHistory.Count > 0 ? maintenanceHistory[^1].Date : null;
     }
 
     /// <summary>
@@ -199,6 +199,6 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// </summary>
     public double TotalMaintenanceCost
     {
-        get => _maintenanceHistory.Sum(r => r.Cost);
+        get => maintenanceHistory.Sum(r => r.Cost);
     }
 }

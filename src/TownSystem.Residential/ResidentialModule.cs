@@ -14,9 +14,9 @@ namespace TownSystem.Residential;
 /// </summary>
 public sealed class ResidentialModule : ISimulationModule, ISaveable
 {
-    private ResidentialBuildingRegistry? _registry;
-    private IWorld? _world;
-    private IMapService? _mapService;
+    private ResidentialBuildingRegistry? registry;
+    private IWorld? world;
+    private IMapService? mapService;
 
     public string Name => "Residential";
     public string SaveKey => "residential";
@@ -29,13 +29,13 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     {
         ArgumentNullException.ThrowIfNull(world);
 
-        _world = world;
+        this.world = world;
 
         // Создаем реестр
-        _registry = new ResidentialBuildingRegistry(world.Events, world.GetService<IMapService>());
+        registry = new ResidentialBuildingRegistry(world.Events, world.GetService<IMapService>());
 
         // Регистрируем реестр как сервис для других модулей
-        world.RegisterService<IBuildingRegistry>(_registry);
+        world.RegisterService<IBuildingRegistry>(registry);
     }
 
     /// <summary>
@@ -44,10 +44,10 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public void OnWorldReady()
     {
-        if (_world == null)
+        if (world == null)
             throw new InvalidOperationException("Initialize должен быть вызван перед OnWorldReady");
 
-        _mapService = _world.GetService<IMapService>();
+        mapService = world.GetService<IMapService>();
     }
 
     /// <summary>
@@ -56,11 +56,11 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public void Tick(TickContext context)
     {
-        if (_registry == null)
+        if (registry == null)
             return;
 
         // Обновляем износ всех зданий
-        foreach (var building in _registry.All.OfType<ResidentialBuilding>())
+        foreach (var building in registry.All.OfType<ResidentialBuilding>())
         {
             building.AccumulateWear(context.Delta);
         }
@@ -71,13 +71,13 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public JsonNode Save()
     {
-        if (_registry == null)
+        if (registry == null)
             return new JsonObject();
 
         var root = new JsonObject();
         var buildingsArray = new JsonArray();
 
-        foreach (var building in _registry.All.OfType<ResidentialBuilding>())
+        foreach (var building in registry.All.OfType<ResidentialBuilding>())
         {
             var buildingObj = new JsonObject
             {
@@ -120,17 +120,17 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public void Load(JsonNode state)
     {
-        if (_registry == null || _mapService == null || _world == null)
+        if (registry == null || mapService == null || world == null)
             return;
 
         if (state?["buildings"] is not JsonArray buildingsArray)
             return;
 
         // Очищаем текущий реестр
-        var existingIds = _registry.All.Select(b => b.Id).ToList();
+        var existingIds = registry.All.Select(b => b.Id).ToList();
         foreach (var id in existingIds)
         {
-            _registry.Remove(id);
+            registry.Remove(id);
         }
 
         // Восстанавливаем здания
@@ -181,7 +181,7 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
                 }
 
                 // Добавляем в реестр
-                _registry.TryAdd(building);
+                registry.TryAdd(building);
             }
             catch (Exception ex)
             {
@@ -196,10 +196,10 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public bool TryAddResidentialBuilding(ResidentialBuilding building)
     {
-        if (_registry == null)
+        if (registry == null)
             throw new InvalidOperationException("Модуль не инициализирован");
 
-        return _registry.TryAdd(building);
+        return registry.TryAdd(building);
     }
 
     /// <summary>
@@ -207,14 +207,14 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public bool RemoveBuilding(EntityId buildingId)
     {
-        if (_registry == null)
+        if (registry == null)
             throw new InvalidOperationException("Модуль не инициализирован");
 
-        return _registry.Remove(buildingId);
+        return registry.Remove(buildingId);
     }
 
     /// <summary>
     /// Получает реестр для прямого доступа (внутреннее использование).
     /// </summary>
-    internal ResidentialBuildingRegistry? GetRegistry() => _registry;
+    internal ResidentialBuildingRegistry? GetRegistry() => registry;
 }
