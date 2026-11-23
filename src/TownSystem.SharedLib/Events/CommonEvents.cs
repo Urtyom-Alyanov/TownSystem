@@ -34,6 +34,11 @@ public sealed record EmergencyReported(Guid EmergencyId, EmergencyKind Kind, Pos
 public sealed record EmergencyResolved(Guid EmergencyId) : IWorldEvent;
 
 /// <summary>
+/// Происшествие отменено.
+/// </summary>
+public sealed record EmergencyCancelled(Guid EmergencyId) : IWorldEvent;
+
+/// <summary>
 /// Объект изменил экологию в точке (завод ухудшает, парк улучшает).
 /// Отрицательное значение — ухудшение.
 /// </summary>
