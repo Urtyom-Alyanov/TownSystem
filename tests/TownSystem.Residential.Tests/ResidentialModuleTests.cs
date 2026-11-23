@@ -138,6 +138,7 @@ public class ResidentialModuleTests
         world.RegisterService<IMapService>(new MockMapService());
         var module = new ResidentialModule();
         module.Initialize(world);
+        module.OnWorldReady();
 
         var building = new ResidentialBuilding(
             "Test", ResidentialBuildingType.PrivateHouse,
@@ -159,6 +160,7 @@ public class ResidentialModuleTests
         world.RegisterService<IMapService>(new MockMapService());
         var module = new ResidentialModule();
         module.Initialize(world);
+        module.OnWorldReady();
 
         var building = new ResidentialBuilding(
             "Test", ResidentialBuildingType.PrivateHouse,
@@ -181,6 +183,7 @@ public class ResidentialModuleTests
         world.RegisterService<IMapService>(new MockMapService());
         var module = new ResidentialModule();
         module.Initialize(world);
+        module.OnWorldReady();
 
         var building = new ResidentialBuilding(
             "Test", ResidentialBuildingType.PrivateHouse,
@@ -204,6 +207,7 @@ public class ResidentialModuleTests
         world.RegisterService<IMapService>(new MockMapService());
         var module = new ResidentialModule();
         module.Initialize(world);
+        module.OnWorldReady();
 
         // Act & Assert - Should not throw
         module.Load(new System.Text.Json.Nodes.JsonObject());
@@ -225,5 +229,81 @@ public class ResidentialModuleTests
         Assert.NotNull(json);
         var buildingsArray = json["buildings"];
         Assert.Empty(buildingsArray!.AsArray());
+    }
+
+    private sealed class StubMapModule : ISimulationModule
+    {
+        public string Name => "Map";
+        public int Order => -100;
+
+        public void Initialize(IWorld world)
+        {
+            world.RegisterService<IMapService>(new MockMapService());
+        }
+
+        public void Tick(TickContext context) { }
+    }
+
+    [Fact]
+    public void WorldStart_WhenResidentialRegisteredBeforeMap_InitializesAndWorks()
+    {
+        // Arrange: специально регистрируем ResidentialModule раньше модуля карты
+        var world = new World();
+        var residentialModule = new ResidentialModule();
+        var mapModule = new StubMapModule();
+
+        // Act
+        world.RegisterModule(residentialModule);
+        world.RegisterModule(mapModule);
+        world.Start();
+
+        var registry = world.GetService<IBuildingRegistry>();
+        var building = new ResidentialBuilding(
+            "Дом 1", ResidentialBuildingType.PrivateHouse,
+            new Position(10, 10), new Footprint(2, 2), 1, DateTime.Now
+        );
+
+        // Assert: порядок модулей отсортирован (-100, затем -50), реестр рабочий и единственный
+        Assert.Equal(new[] { "Map", "Residential" }, world.Modules.Select(m => m.Name));
+        Assert.True(residentialModule.TryAddResidentialBuilding(building));
+        Assert.Single(registry.All);
+        Assert.Same(registry.Find(building.Id), building);
+    }
+
+    [Fact]
+    public void OnWorldReady_KeepsSingleBuildingRegistryInstance()
+    {
+        // Arrange
+        var world = new World();
+        var residentialModule = new ResidentialModule();
+        world.RegisterModule(residentialModule);
+        var registryAfterInitialize = world.GetService<IBuildingRegistry>();
+
+        world.RegisterModule(new StubMapModule());
+
+        // Act
+        world.Start();
+        var registryAfterStart = world.GetService<IBuildingRegistry>();
+
+        // Assert
+        Assert.Same(registryAfterInitialize, registryAfterStart);
+    }
+
+    [Fact]
+    public void TryAddResidentialBuilding_BeforeOnWorldReady_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var world = new World();
+        var residentialModule = new ResidentialModule();
+        world.RegisterModule(residentialModule);
+
+        var building = new ResidentialBuilding(
+            "Дом 1", ResidentialBuildingType.PrivateHouse,
+            new Position(10, 10), new Footprint(2, 2), 1, DateTime.Now
+        );
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() =>
+            residentialModule.TryAddResidentialBuilding(building));
     }
 }

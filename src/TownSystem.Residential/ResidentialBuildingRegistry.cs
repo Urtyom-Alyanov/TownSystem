@@ -12,7 +12,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
 {
     private readonly Dictionary<EntityId, IBuilding> buildings;
     private readonly IEventBus eventBus;
-    private readonly IMapService mapService;
+    private IMapService? mapService;
 
     /// <summary>
     /// Создаёт новый реестр зданий.
@@ -20,10 +20,26 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <param name="eventBus">Шина событий для публикации событий добавления/удаления</param>
     /// <param name="mapService">Сервис карты для проверки допустимости местности</param>
     public ResidentialBuildingRegistry(IEventBus eventBus, IMapService mapService)
+        : this(eventBus)
+    {
+        this.mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
+    }
+
+    /// <summary>
+    /// Создаёт реестр на этапе Initialize до получения IMapService в OnWorldReady.
+    /// </summary>
+    internal ResidentialBuildingRegistry(IEventBus eventBus)
     {
         this.eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
-        this.mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
         buildings = new Dictionary<EntityId, IBuilding>();
+    }
+
+    /// <summary>
+    /// Подключает сервис карты после инициализации всех модулей мира.
+    /// </summary>
+    internal void SetMapService(IMapService mapService)
+    {
+        this.mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
     }
 
     /// <summary>
@@ -46,16 +62,18 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         if (building == null)
             throw new ArgumentNullException(nameof(building));
 
+        var currentMapService = GetMapService();
+
         // Проверка, что здание еще не добавлено
         if (buildings.ContainsKey(building.Id))
             return false;
 
         // Проверка выхода за границы карты
-        if (!IsWithinMapBounds(building))
+        if (!IsWithinMapBounds(building, currentMapService))
             return false;
 
         // Проверка пригодности местности
-        if (!IsBuildableArea(building))
+        if (!IsBuildableArea(building, currentMapService))
             return false;
 
         // Проверка пересечений с другими зданиями
@@ -106,10 +124,18 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         );
     }
 
+    private IMapService GetMapService()
+    {
+        if (mapService == null)
+            throw new InvalidOperationException("Сервис карты (IMapService) ещё не подключён. Убедитесь, что вызван OnWorldReady().");
+
+        return mapService;
+    }
+
     /// <summary>
     /// Проверяет, находится ли здание полностью внутри границ карты.
     /// </summary>
-    private bool IsWithinMapBounds(IBuilding building)
+    private static bool IsWithinMapBounds(IBuilding building, IMapService currentMapService)
     {
         var minX = (uint)building.Position.X;
         var minY = (uint)building.Position.Y;
@@ -117,10 +143,10 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         var maxY = minY + building.Footprint.Height - 1;
 
         // Проверяем границы карты для всех углов
-        if (!mapService.InBounds(minX, minY))
+        if (!currentMapService.InBounds(minX, minY))
             return false;
 
-        if (!mapService.InBounds(maxX, maxY))
+        if (!currentMapService.InBounds(maxX, maxY))
             return false;
 
         return true;
@@ -129,7 +155,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
     /// <summary>
     /// Проверяет, что все клетки, занимаемые зданием, пригодны для постройки.
     /// </summary>
-    private bool IsBuildableArea(IBuilding building)
+    private static bool IsBuildableArea(IBuilding building, IMapService currentMapService)
     {
         var minX = (uint)building.Position.X;
         var minY = (uint)building.Position.Y;
@@ -140,7 +166,7 @@ public sealed class ResidentialBuildingRegistry : IBuildingRegistry
         {
             for (uint y = minY; y <= maxY; y++)
             {
-                if (!mapService.IsBuildable(x, y))
+                if (!currentMapService.IsBuildable(x, y))
                     return false;
             }
         }

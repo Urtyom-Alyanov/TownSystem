@@ -31,10 +31,8 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
 
         this.world = world;
 
-        // Создаем реестр
-        registry = new ResidentialBuildingRegistry(world.Events, world.GetService<IMapService>());
-
-        // Регистрируем реестр как сервис для других модулей
+        // Создаем реестр и публикуем его сразу, а карту подключим в OnWorldReady
+        registry = new ResidentialBuildingRegistry(world.Events);
         world.RegisterService<IBuildingRegistry>(registry);
     }
 
@@ -44,10 +42,11 @@ public sealed class ResidentialModule : ISimulationModule, ISaveable
     /// </summary>
     public void OnWorldReady()
     {
-        if (world == null)
+        if (world == null || registry == null)
             throw new InvalidOperationException("Initialize должен быть вызван перед OnWorldReady");
 
         mapService = world.GetService<IMapService>();
+        registry.SetMapService(mapService);
     }
 
     /// <summary>
