@@ -4,6 +4,7 @@ using TownSystem.SharedLib.Contracts;
 using TownSystem.SharedLib.Core;
 using TownSystem.SharedLib.Events;
 using TownSystem.SharedLib.Simulation;
+using TownSystem.SharedLib.Persistence;
 
 namespace TownSystem.Population.Tests;
 
@@ -321,5 +322,308 @@ public class PopulationModuleTests
 
         var householdObj = (JsonObject)householdsArray[0]!;
         Assert.Equal(0.9, householdObj["satisfaction"]!.GetValue<double>());
+    }
+
+    private sealed class TestBuilding : IBuilding
+    {
+        public required EntityId Id { get; init; }
+        public string Name => "Здание";
+        public required BuildingCategory Category { get; init; }
+        public Position Position => new(0, 0);
+        public Footprint Footprint => new(2, 2);
+        public uint Floors => 1;
+        public uint Capacity => 10;
+        public double Wear => 0;
+    }
+
+    private sealed class InMemoryBuildingRegistry : IBuildingRegistry
+    {
+        private readonly Dictionary<EntityId, IBuilding> buildings = new();
+        public IReadOnlyCollection<IBuilding> All => buildings.Values;
+        public bool TryAdd(IBuilding building) => buildings.TryAdd(building.Id, building);
+        public bool Remove(EntityId id) => buildings.Remove(id);
+        public IBuilding? Find(EntityId id) => buildings.TryGetValue(id, out var b) ? b : null;
+        public IEnumerable<IBuilding> FindNear(Position center, double radius) => buildings.Values;
+    }
+
+    private sealed class StubBuildingRegistryModule(IBuildingRegistry registry) : ISimulationModule
+    {
+        public string Name => "StubBuildings";
+        public int Order => -50;
+        public void Initialize(IWorld world) => world.RegisterService(registry);
+        public void Tick(TickContext context) { }
+    }
+
+    [Fact]
+    public void SaveAndLoad_ThroughSaveService_RestoresAllFieldsAndRelations()
+    {
+        // Arrange
+        var buildingId = EntityId.New();
+        var workplaceId = EntityId.New();
+
+        var registry1 = new InMemoryBuildingRegistry();
+        registry1.TryAdd(new TestBuilding { Id = buildingId, Category = BuildingCategory.Residential });
+
+        var world1 = new World();
+        world1.RegisterModule(new StubBuildingRegistryModule(registry1));
+        var popModule1 = new PopulationModule();
+        world1.RegisterModule(popModule1);
+        world1.Start();
+
+        var service1 = popModule1.GetService()!;
+
+        var citizen1 = new Citizen(EntityId.New(), "Иван", 34, new Position(12.5, 34.2))
+        {
+            WorkplaceId = workplaceId,
+            Education = EducationLevel.University,
+            Health = 0.72
+        };
+        var citizen2 = new Citizen(EntityId.New(), "Мария", 31, new Position(15.0, 20.0))
+        {
+            Education = EducationLevel.College,
+            Health = 0.95
+        };
+
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen1);
+        family.AddMember(citizen2);
+
+        var moveInDate = new DateTime(2025, 3, 15, 10, 30, 0, DateTimeKind.Utc);
+        var household = new Household(family, buildingId, moveInDate)
+        {
+            Satisfaction = 0.85
+        };
+
+        Assert.True(service1.RegisterCitizen(citizen1));
+        Assert.True(service1.RegisterCitizen(citizen2));
+        Assert.True(service1.RegisterFamily(family));
+        Assert.True(service1.RegisterHousehold(household));
+
+        string json = SaveService.SaveToJson(world1);
+
+        // Act: загружаем в новый мир с тем же зданием
+        var registry2 = new InMemoryBuildingRegistry();
+        registry2.TryAdd(new TestBuilding { Id = buildingId, Category = BuildingCategory.Residential });
+
+        var world2 = new World();
+        world2.RegisterModule(new StubBuildingRegistryModule(registry2));
+        var popModule2 = new PopulationModule();
+        world2.RegisterModule(popModule2);
+        world2.Start();
+
+        SaveService.LoadFromJson(world2, json);
+
+        // Assert
+        var service2 = popModule2.GetService()!;
+        Assert.Equal(2, service2.People.Count);
+        Assert.Single(service2.Families);
+        Assert.Single(service2.Households);
+
+        var loaded1 = service2.FindCitizen(citizen1.Id);
+        Assert.NotNull(loaded1);
+        Assert.Equal("Иван", loaded1.Name);
+        Assert.Equal(34u, loaded1.Age);
+        Assert.Equal(new Position(12.5, 34.2), loaded1.Position);
+        Assert.Equal(workplaceId, loaded1.WorkplaceId);
+        Assert.Equal(EducationLevel.University, loaded1.Education);
+        Assert.Equal(0.72, loaded1.Health, precision: 5);
+        Assert.Equal(buildingId, loaded1.HomeId);
+
+        var loaded2 = service2.FindCitizen(citizen2.Id);
+        Assert.NotNull(loaded2);
+        Assert.Null(loaded2.WorkplaceId);
+        Assert.Equal(EducationLevel.College, loaded2.Education);
+        Assert.Equal(0.95, loaded2.Health, precision: 5);
+        Assert.Equal(buildingId, loaded2.HomeId);
+
+        var loadedFamily = service2.FindFamily(family.Id);
+        Assert.NotNull(loadedFamily);
+        Assert.Equal("Петровы", loadedFamily.Name);
+        Assert.Equal(2, loadedFamily.MemberCount);
+
+        var loadedHousehold = service2.FindHousehold(family.Id);
+        Assert.NotNull(loadedHousehold);
+        Assert.Equal(buildingId, loadedHousehold.BuildingId);
+        Assert.Equal(moveInDate, loadedHousehold.MoveInDate);
+        Assert.Equal(0.85, loadedHousehold.Satisfaction, precision: 5);
+
+        Assert.Equal(buildingId, service2.GetResidence(citizen1.Id));
+        Assert.Equal(2, service2.GetResidentsOfBuilding(buildingId).Count);
+    }
+
+    [Fact]
+    public void Load_WhenBuildingMissingInRegistry_SkipsHouseholdAndKeepsCitizensHomeless()
+    {
+        // Arrange: сохраняем мир со зданием
+        var missingBuildingId = EntityId.New();
+        var registry1 = new InMemoryBuildingRegistry();
+        registry1.TryAdd(new TestBuilding { Id = missingBuildingId, Category = BuildingCategory.Residential });
+
+        var world1 = new World();
+        world1.RegisterModule(new StubBuildingRegistryModule(registry1));
+        var popModule1 = new PopulationModule();
+        world1.RegisterModule(popModule1);
+        world1.Start();
+
+        var service1 = popModule1.GetService()!;
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen);
+        service1.RegisterCitizen(citizen);
+        service1.RegisterFamily(family);
+        service1.RegisterHousehold(new Household(family, missingBuildingId));
+
+        string json = SaveService.SaveToJson(world1);
+
+        // Act: в новом мире этого здания нет
+        var world2 = new World();
+        world2.RegisterModule(new StubBuildingRegistryModule(new InMemoryBuildingRegistry()));
+        var popModule2 = new PopulationModule();
+        world2.RegisterModule(popModule2);
+        world2.Start();
+
+        SaveService.LoadFromJson(world2, json);
+
+        // Assert
+        var service2 = popModule2.GetService()!;
+        var loadedCitizen = service2.FindCitizen(citizen.Id);
+        Assert.NotNull(loadedCitizen);
+        Assert.Null(loadedCitizen.HomeId);
+        Assert.Null(service2.GetResidence(citizen.Id));
+        Assert.NotNull(service2.FindFamily(family.Id));
+        Assert.Null(service2.FindHousehold(family.Id));
+        Assert.Empty(service2.Households);
+    }
+
+    [Fact]
+    public void Load_WhenBuildingIsNotResidential_SkipsHousehold()
+    {
+        // Arrange
+        var buildingId = EntityId.New();
+        var registry1 = new InMemoryBuildingRegistry();
+        registry1.TryAdd(new TestBuilding { Id = buildingId, Category = BuildingCategory.Residential });
+
+        var world1 = new World();
+        world1.RegisterModule(new StubBuildingRegistryModule(registry1));
+        var popModule1 = new PopulationModule();
+        world1.RegisterModule(popModule1);
+        world1.Start();
+
+        var service1 = popModule1.GetService()!;
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen);
+        service1.RegisterCitizen(citizen);
+        service1.RegisterFamily(family);
+        service1.RegisterHousehold(new Household(family, buildingId));
+
+        string json = SaveService.SaveToJson(world1);
+
+        // Act: в новом мире под этим ID числится промышленное здание
+        var registry2 = new InMemoryBuildingRegistry();
+        registry2.TryAdd(new TestBuilding { Id = buildingId, Category = BuildingCategory.Industrial });
+
+        var world2 = new World();
+        world2.RegisterModule(new StubBuildingRegistryModule(registry2));
+        var popModule2 = new PopulationModule();
+        world2.RegisterModule(popModule2);
+        world2.Start();
+
+        SaveService.LoadFromJson(world2, json);
+
+        // Assert
+        var service2 = popModule2.GetService()!;
+        var loadedCitizen = service2.FindCitizen(citizen.Id)!;
+        Assert.Null(loadedCitizen.HomeId);
+        Assert.Empty(service2.Households);
+    }
+
+    [Fact]
+    public void Load_AfterUnregisterCitizen_DoesNotResurrectDeletedCitizen()
+    {
+        // Arrange
+        var buildingId = EntityId.New();
+        var registry = new InMemoryBuildingRegistry();
+        registry.TryAdd(new TestBuilding { Id = buildingId, Category = BuildingCategory.Residential });
+
+        var world1 = new World();
+        world1.RegisterModule(new StubBuildingRegistryModule(registry));
+        var popModule1 = new PopulationModule();
+        world1.RegisterModule(popModule1);
+        world1.Start();
+
+        var service1 = popModule1.GetService()!;
+        var citizen1 = new Citizen(EntityId.New(), "Удалённый", 40, new Position(0, 0));
+        var citizen2 = new Citizen(EntityId.New(), "Живой", 35, new Position(0, 0));
+        var family = new Family(EntityId.New(), "Семья");
+        family.AddMember(citizen1);
+        family.AddMember(citizen2);
+
+        service1.RegisterCitizen(citizen1);
+        service1.RegisterCitizen(citizen2);
+        service1.RegisterFamily(family);
+        service1.RegisterHousehold(new Household(family, buildingId));
+        service1.UnregisterCitizen(citizen1.Id);
+
+        string json = SaveService.SaveToJson(world1);
+
+        // Act
+        var world2 = new World();
+        world2.RegisterModule(new StubBuildingRegistryModule(registry));
+        var popModule2 = new PopulationModule();
+        world2.RegisterModule(popModule2);
+        world2.Start();
+
+        SaveService.LoadFromJson(world2, json);
+
+        // Assert
+        var service2 = popModule2.GetService()!;
+        Assert.Single(service2.People);
+        Assert.Null(service2.FindCitizen(citizen1.Id));
+        Assert.NotNull(service2.FindCitizen(citizen2.Id));
+        Assert.Single(service2.FindFamily(family.Id)!.Members);
+    }
+
+    [Fact]
+    public void Load_CalledTwiceWithSameJson_DoesNotCreateDuplicates()
+    {
+        // Arrange
+        var buildingId = EntityId.New();
+        var registry = new InMemoryBuildingRegistry();
+        registry.TryAdd(new TestBuilding { Id = buildingId, Category = BuildingCategory.Residential });
+
+        var world1 = new World();
+        world1.RegisterModule(new StubBuildingRegistryModule(registry));
+        var popModule1 = new PopulationModule();
+        world1.RegisterModule(popModule1);
+        world1.Start();
+
+        var service1 = popModule1.GetService()!;
+        var citizen = new Citizen(EntityId.New(), "Иван", 30, new Position(0, 0));
+        var family = new Family(EntityId.New(), "Петровы");
+        family.AddMember(citizen);
+        service1.RegisterCitizen(citizen);
+        service1.RegisterFamily(family);
+        service1.RegisterHousehold(new Household(family, buildingId));
+
+        string json = SaveService.SaveToJson(world1);
+
+        var world2 = new World();
+        world2.RegisterModule(new StubBuildingRegistryModule(registry));
+        var popModule2 = new PopulationModule();
+        world2.RegisterModule(popModule2);
+        world2.Start();
+
+        // Act: загружаем дважды подряд
+        SaveService.LoadFromJson(world2, json);
+        SaveService.LoadFromJson(world2, json);
+
+        // Assert
+        var service2 = popModule2.GetService()!;
+        Assert.Single(service2.People);
+        Assert.Single(service2.Families);
+        Assert.Single(service2.Households);
+        Assert.Single(service2.FindFamily(family.Id)!.Members);
+        Assert.Single(service2.GetResidentsOfBuilding(buildingId));
     }
 }

@@ -8,20 +8,22 @@ namespace TownSystem.Population;
 public class Household
 {
     private readonly Family family;
+    private double satisfaction = 0.5;
 
     /// <summary>
     /// Создаёт домохозяйство.
     /// </summary>
     /// <param name="family">Семья</param>
     /// <param name="buildingId">ID здания, где проживает семья</param>
-    public Household(Family family, EntityId buildingId)
+    /// <param name="moveInDate">Дата заселения (опционально, по умолчанию DateTime.UtcNow)</param>
+    public Household(Family family, EntityId buildingId, DateTime? moveInDate = null)
     {
         this.family = family ?? throw new ArgumentNullException(nameof(family));
         if (buildingId == default)
             throw new ArgumentException("Идентификатор здания не может быть пустым", nameof(buildingId));
 
         BuildingId = buildingId;
-        MoveInDate = DateTime.UtcNow;
+        MoveInDate = moveInDate ?? DateTime.UtcNow;
     }
 
     /// <summary>
@@ -49,7 +51,17 @@ public class Household
     /// Зависит от состояния здания, размера жилья, удобств.
     /// От 0 (недовольны) до 1 (полностью довольны).
     /// </summary>
-    public double Satisfaction { get; set; } = 0.5;
+    public double Satisfaction
+    {
+        get => satisfaction;
+        set
+        {
+            if (!double.IsFinite(value))
+                throw new ArgumentOutOfRangeException(nameof(value), "Удовлетворённость должна быть конечным числом");
+
+            satisfaction = Math.Clamp(value, 0.0, 1.0);
+        }
+    }
 
     /// <summary>
     /// Возвращает строковое представление для отладки.

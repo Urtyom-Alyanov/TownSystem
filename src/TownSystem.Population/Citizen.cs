@@ -48,8 +48,20 @@ public class Citizen : IPerson
     /// <inheritdoc />
     public EducationLevel Education { get; set; }
 
+    private double health = 1.0;
+
     /// <inheritdoc />
-    public double Health { get; set; }
+    public double Health
+    {
+        get => health;
+        set
+        {
+            if (!double.IsFinite(value))
+                throw new ArgumentOutOfRangeException(nameof(value), "Здоровье должно быть конечным числом");
+
+            health = Math.Clamp(value, 0.0, 1.0);
+        }
+    }
 
     /// <summary>
     /// Возвращает строковое представление для отладки.

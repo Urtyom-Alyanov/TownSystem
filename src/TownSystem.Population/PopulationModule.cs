@@ -126,17 +126,15 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
     /// </summary>
     public void Load(JsonNode state)
     {
-        if (populationService == null)
+        if (populationService == null || state == null)
             return;
 
-        // Очищаем текущее состояние
+        // Очищаем текущее состояние перед загрузкой
         populationService.Clear();
 
         // Восстанавливаем горожан
-        if (state?["citizens"] is JsonArray citizensArray)
+        if (state["citizens"] is JsonArray citizensArray)
         {
-            var citizens = new Dictionary<EntityId, Citizen>();
-
             foreach (var citizenNode in citizensArray.OfType<JsonObject>())
             {
                 try
@@ -146,7 +144,7 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
                     var age = citizenNode["age"]!.GetValue<uint>();
                     var positionX = citizenNode["positionX"]!.GetValue<double>();
                     var positionY = citizenNode["positionY"]!.GetValue<double>();
-                    var workplaceIdStr = citizenNode["workplaceId"]!.GetValue<string>();
+                    var workplaceIdStr = citizenNode["workplaceId"]?.GetValue<string>() ?? "";
                     var education = Enum.Parse<EducationLevel>(citizenNode["education"]!.GetValue<string>());
                     var health = citizenNode["health"]!.GetValue<double>();
 
@@ -163,7 +161,6 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
                     };
 
                     populationService.RegisterCitizen(citizen);
-                    citizens[id] = citizen;
                 }
                 catch (Exception ex)
                 {
@@ -173,10 +170,8 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
         }
 
         // Восстанавливаем семьи
-        if (state?["families"] is JsonArray familiesArray)
+        if (state["families"] is JsonArray familiesArray)
         {
-            var families = new Dictionary<EntityId, Family>();
-
             foreach (var familyNode in familiesArray.OfType<JsonObject>())
             {
                 try
@@ -186,7 +181,6 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
 
                     var family = new Family(id, name);
 
-                    // Добавляем членов семьи
                     if (familyNode["memberIds"] is JsonArray memberIds)
                     {
                         foreach (var memberId in memberIds.OfType<JsonValue>())
@@ -200,7 +194,6 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
                     }
 
                     populationService.RegisterFamily(family);
-                    families[id] = family;
                 }
                 catch (Exception ex)
                 {
@@ -210,7 +203,7 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
         }
 
         // Восстанавливаем домохозяйства
-        if (state?["households"] is JsonArray householdsArray)
+        if (state["households"] is JsonArray householdsArray)
         {
             foreach (var householdNode in householdsArray.OfType<JsonObject>())
             {
@@ -220,9 +213,27 @@ public sealed class PopulationModule : ISimulationModule, ISaveable
                     var buildingId = new EntityId(Guid.ParseExact(householdNode["buildingId"]!.GetValue<string>(), "N"));
                     var satisfaction = householdNode["satisfaction"]!.GetValue<double>();
 
+                    if (buildingId == default)
+                        continue;
+
+                    if (buildingRegistry != null)
+                    {
+                        var building = buildingRegistry.Find(buildingId);
+                        if (building == null || building.Category != BuildingCategory.Residential)
+                        {
+                            System.Diagnostics.Debug.WriteLine(
+                                $"Домохозяйство семьи {familyId} не загружено: здание {buildingId} отсутствует или не является жилым.");
+                            continue;
+                        }
+                    }
+
+                    DateTime? moveInDate = householdNode["moveInDate"] is JsonValue moveInVal
+                        ? new DateTime(moveInVal.GetValue<long>(), DateTimeKind.Utc)
+                        : null;
+
                     if (populationService.FindFamily(familyId) is Family family)
                     {
-                        var household = new Household(family, buildingId)
+                        var household = new Household(family, buildingId, moveInDate)
                         {
                             Satisfaction = satisfaction
                         };
