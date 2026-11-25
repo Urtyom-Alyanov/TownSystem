@@ -1,0 +1,410 @@
+﻿<UserControl x:Class="TownSystem.Residential.UI.Views.ResidentialView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0C1115" FontFamily="Segoe UI">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="PanelColor" Color="#202C34"/>
+        <SolidColorBrush x:Key="SubPanelColor" Color="#151F26"/>
+        <SolidColorBrush x:Key="LineColor" Color="#344550"/>
+        <SolidColorBrush x:Key="TextColor" Color="#F0F5F6"/>
+        <SolidColorBrush x:Key="MutedColor" Color="#ABC0C7"/>
+        <SolidColorBrush x:Key="AccentColor" Color="#70DABC"/>
+        <SolidColorBrush x:Key="DangerColor" Color="#E36D6D"/>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+        </Style>
+
+        <Style x:Key="Panel" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelColor}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LineColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="Padding" Value="14,10"/>
+        </Style>
+
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="Background" Value="#263640"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder" Padding="{TemplateBinding Padding}" CornerRadius="8"
+                                Background="{TemplateBinding Background}" BorderBrush="{StaticResource LineColor}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#354E53"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource SubPanelColor}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LineColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="CaretBrush" Value="{StaticResource AccentColor}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="7" Padding="{TemplateBinding Padding}">
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="Background" Value="{StaticResource SubPanelColor}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource LineColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Focusable="False" ClickMode="Press">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{StaticResource SubPanelColor}" BorderBrush="{StaticResource LineColor}"
+                                                BorderThickness="1" CornerRadius="7" Padding="8,5">
+                                            <DockPanel>
+                                                <TextBlock DockPanel.Dock="Right" Text="▾" Foreground="{StaticResource MutedColor}" Margin="6,0,0,0"/>
+                                                <ContentPresenter/>
+                                            </DockPanel>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
+                                                  ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
+                            </ToggleButton>
+                            <Popup IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" Focusable="False">
+                                <Border Background="{StaticResource PanelColor}" BorderBrush="{StaticResource LineColor}"
+                                        BorderThickness="1" CornerRadius="8" Margin="0,3,0,0" MinWidth="{TemplateBinding ActualWidth}">
+                                    <ScrollViewer MaxHeight="200">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+                        <Setter Property="Padding" Value="10,6"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="ItemBorder" Padding="{TemplateBinding Padding}" CornerRadius="6" Margin="2">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="#293D44"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="#294A44"/>
+                                            <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="BuildingListItem" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{StaticResource TextColor}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ItemCard" Background="{StaticResource SubPanelColor}" BorderBrush="{StaticResource LineColor}"
+                                BorderThickness="1" CornerRadius="9" Padding="10,8">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ItemCard" Property="Background" Value="#293D44"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemCard" Property="Background" Value="#294A44"/>
+                                <Setter TargetName="ItemCard" Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="InfoLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedColor}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+
+        <Style x:Key="InfoValue" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="12,8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Верхняя плашка в стиле MapView -->
+        <Grid Margin="0,0,0,10">
+            <Border Style="{StaticResource Panel}" Padding="12,7" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Жилой фонд" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{StaticResource MutedColor}" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <Run Text="Зданий: "/><Run Text="{Binding BuildingCount, Mode=OneWay}" Foreground="{StaticResource AccentColor}" FontWeight="SemiBold"/>
+                        <Run Text="  ·  Вместимость: "/><Run Text="{Binding TotalCapacity, Mode=OneWay}" Foreground="{StaticResource TextColor}" FontWeight="SemiBold"/>
+                        <Run Text="  ·  Средний износ: "/><Run Text="{Binding AverageWearText, Mode=OneWay}" Foreground="{StaticResource TextColor}" FontWeight="SemiBold"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Основная рабочая область -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Левая колонка: список зданий и форма постройки -->
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Style="{StaticResource Panel}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Список зданий" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+                        <ListBox ItemsSource="{Binding Buildings.Items}" SelectedItem="{Binding Buildings.SelectedItem}"
+                                 ItemContainerStyle="{StaticResource BuildingListItem}"
+                                 Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Foreground="{StaticResource AccentColor}" FontSize="12"
+                                                   Text="{Binding Capacity, StringFormat={}{0} мест}" VerticalAlignment="Center"/>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"/>
+                                            <TextBlock Foreground="{StaticResource MutedColor}" FontSize="11">
+                                                <Run Text="{Binding Position, Mode=OneWay}"/>
+                                                <Run Text=" · "/>
+                                                <Run Text="{Binding Floors, Mode=OneWay}"/>
+                                                <Run Text=" эт."/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+
+                <Border Grid.Row="2" Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <TextBlock Text="Построить здание" FontWeight="SemiBold" FontSize="15" Margin="0,0,0,8"/>
+
+                        <TextBlock Text="Название" Style="{StaticResource InfoLabel}"/>
+                        <TextBox Text="{Binding NewBuildingName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DarkTextBox}" Margin="0,0,0,7"/>
+
+                        <TextBlock Text="Тип здания" Style="{StaticResource InfoLabel}"/>
+                        <ComboBox ItemsSource="{Binding BuildingTypeOptions}" SelectedItem="{Binding SelectedBuildingType}"
+          Style="{StaticResource DarkComboBox}" Margin="0,0,0,7">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <UniformGrid Columns="5" Margin="0,0,0,10">
+                            <StackPanel Margin="0,0,5,0">
+                                <TextBlock Text="X" Style="{StaticResource InfoLabel}"/>
+                                <TextBox Text="{Binding NewPosX, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DarkTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,5,0">
+                                <TextBlock Text="Y" Style="{StaticResource InfoLabel}"/>
+                                <TextBox Text="{Binding NewPosY, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DarkTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,5,0">
+                                <TextBlock Text="Шир." Style="{StaticResource InfoLabel}"/>
+                                <TextBox Text="{Binding NewWidth, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DarkTextBox}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,5,0">
+                                <TextBlock Text="Выс." Style="{StaticResource InfoLabel}"/>
+                                <TextBox Text="{Binding NewHeight, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DarkTextBox}"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Этажи" Style="{StaticResource InfoLabel}"/>
+                                <TextBox Text="{Binding NewFloors, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource DarkTextBox}"/>
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <Button Content="Построить жилой дом" Command="{Binding BuildCommand}"
+                                Style="{StaticResource ActionButton}" Foreground="{StaticResource AccentColor}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Правая колонка: карточка выбранного здания и история обслуживания -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="10"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Style="{StaticResource Panel}">
+                    <StackPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Foreground="{StaticResource AccentColor}" FontWeight="SemiBold"
+                                       Text="{Binding SelectedCoordinatesText}" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedName}" FontWeight="SemiBold" FontSize="16"/>
+                        </DockPanel>
+
+                        <UniformGrid Columns="4" Margin="0,0,0,10">
+                            <StackPanel Margin="0,0,10,8">
+                                <TextBlock Text="Тип" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedTypeText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,8">
+                                <TextBlock Text="Площадь" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedFootprintText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,8">
+                                <TextBlock Text="Этажей" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedFloorsText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,0,8">
+                                <TextBlock Text="Вместимость" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedCapacityText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Состояние" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedConditionText}" Foreground="{Binding SelectedConditionBrush}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Износ" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedWearText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="Возраст" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedAgeText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="Затраты на ремонт" Style="{StaticResource InfoLabel}"/>
+                                <TextBlock Text="{Binding SelectedTotalCostText}" Style="{StaticResource InfoValue}"/>
+                            </StackPanel>
+                        </UniformGrid>
+
+                        <Border Background="{StaticResource SubPanelColor}" CornerRadius="6" Height="8" Margin="0,0,0,12">
+                            <ProgressBar Value="{Binding SelectedWearPercent, Mode=OneWay}" Maximum="100"
+                                         Background="Transparent" BorderThickness="0"
+                                         Foreground="{Binding SelectedConditionBrush}"/>
+                        </Border>
+
+                        <WrapPanel>
+                            <Button Content="Осмотр (200)" Command="{Binding InspectCommand}" Style="{StaticResource ActionButton}" Margin="0,0,8,0"/>
+                            <Button Content="Ремонт (1000)" Command="{Binding RepairCommand}" Style="{StaticResource ActionButton}" Margin="0,0,8,0"/>
+                            <Button Content="Капремонт (5000)" Command="{Binding MajorRepairCommand}" Style="{StaticResource ActionButton}"
+                                    Foreground="{StaticResource AccentColor}" Margin="0,0,8,0"/>
+                            <Button Content="Снести здание" Command="{Binding DemolishCommand}" Style="{StaticResource ActionButton}"
+                                    Foreground="{StaticResource DangerColor}"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Style="{StaticResource Panel}">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <TextBlock DockPanel.Dock="Right" Foreground="{StaticResource MutedColor}" FontSize="12"
+                                       Text="{Binding SelectedLastMaintenanceText, StringFormat=Последнее обслуживание: {0}}"/>
+                            <TextBlock Text="История обслуживания" FontWeight="SemiBold" FontSize="15"/>
+                        </DockPanel>
+
+                        <ListBox ItemsSource="{Binding MaintenanceHistoryItems}" Background="Transparent" BorderThickness="0"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Focusable" Value="False"/>
+                                    <Setter Property="Margin" Value="0,0,0,4"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border Background="{StaticResource SubPanelColor}" BorderBrush="{StaticResource LineColor}"
+                                                        BorderThickness="1" CornerRadius="8" Padding="10,7">
+                                                    <ContentPresenter/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding WearReductionText}" Foreground="{StaticResource AccentColor}" Margin="0,0,12,0" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding CostText}" Foreground="{StaticResource MutedColor}"/>
+                                        </StackPanel>
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold" FontSize="13">
+                                                <Run Text="{Binding TypeText, Mode=OneWay}"/>
+                                                <Run Text=" · " Foreground="{StaticResource MutedColor}"/>
+                                                <Run Text="{Binding DateText, Mode=OneWay}" Foreground="{StaticResource MutedColor}"/>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding DescriptionText}" Foreground="{StaticResource MutedColor}" FontSize="11"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- Строка статуса внизу -->
+        <Border Grid.Row="2" Style="{StaticResource Panel}" Padding="12,7" Margin="0,10,0,0">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="{Binding StatusBrush}" FontSize="12"/>
+        </Border>
+    </Grid>
+</UserControl>

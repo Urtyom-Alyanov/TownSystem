@@ -1,18 +1,19 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/TownSystem.SharedLib/TownSystem.SharedLib.csproj" />
     <Project Path="src/TownSystem.Map/TownSystem.Map.csproj" Id="e8b5f3fa-6e76-40bf-bcbb-afe4cbe6b822" />
-    <Project Path="src/TownSystem.Residential/TownSystem.Residential.csproj" />
     <Project Path="src/TownSystem.Population/TownSystem.Population.csproj" />
+    <Project Path="src/TownSystem.Residential/TownSystem.Residential.csproj" />
+    <Project Path="src/TownSystem.SharedLib/TownSystem.SharedLib.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/TownSystem.SharedLib.Tests/TownSystem.SharedLib.Tests.csproj" />
     <Project Path="tests/TownSystem.Map.Tests/TownSystem.Map.Tests.csproj" Id="ea358254-c6e9-4150-8c2b-38667488609d" />
-    <Project Path="tests/TownSystem.Residential.Tests/TownSystem.Residential.Tests.csproj" />
     <Project Path="tests/TownSystem.Population.Tests/TownSystem.Population.Tests.csproj" />
+    <Project Path="tests/TownSystem.Residential.Tests/TownSystem.Residential.Tests.csproj" />
+    <Project Path="tests/TownSystem.SharedLib.Tests/TownSystem.SharedLib.Tests.csproj" />
   </Folder>
   <Folder Name="/ui/">
     <Project Path="ui/TownSystem.Map.UI/TownSystem.Map.UI.csproj" Id="be18ef4b-dd7d-4bff-bc60-d8e6bf405a41" />
+    <Project Path="ui/TownSystem.Residential.UI/TownSystem.Residential.UI.csproj" />
     <Project Path="ui/TownSystem.UIApp/TownSystem.UIApp.csproj" />
     <Project Path="ui/TownSystem.UILib/TownSystem.UILib.csproj" />
   </Folder>

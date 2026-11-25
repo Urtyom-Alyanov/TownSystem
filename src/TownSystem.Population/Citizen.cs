@@ -27,30 +27,22 @@ public class Citizen : IPerson
         Health = 1.0;
     }
 
-    /// <inheritdoc />
     public EntityId Id { get; }
 
-    /// <inheritdoc />
     public string Name { get; }
 
-    /// <inheritdoc />
     public uint Age { get; set; }
 
-    /// <inheritdoc />
     public Position Position { get; set; }
 
-    /// <inheritdoc />
     public EntityId? HomeId { get; internal set; }
 
-    /// <inheritdoc />
     public EntityId? WorkplaceId { get; set; }
 
-    /// <inheritdoc />
     public EducationLevel Education { get; set; }
 
     private double health = 1.0;
 
-    /// <inheritdoc />
     public double Health
     {
         get => health;

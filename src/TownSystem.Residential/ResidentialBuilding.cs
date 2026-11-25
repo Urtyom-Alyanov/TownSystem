@@ -83,7 +83,6 @@ public sealed class ResidentialBuilding : EntityBase, IBuilding
     /// </summary>
     public IReadOnlyList<MaintenanceRecord> MaintenanceHistory => maintenanceHistory.AsReadOnly();
 
-    // IBuilding implementation
 
     public BuildingCategory Category => BuildingCategory.Residential;
 
