@@ -13,6 +13,7 @@
   </Folder>
   <Folder Name="/ui/">
     <Project Path="ui/TownSystem.Map.UI/TownSystem.Map.UI.csproj" Id="be18ef4b-dd7d-4bff-bc60-d8e6bf405a41" />
+    <Project Path="ui/TownSystem.Population.UI/TownSystem.Population.UI.csproj" />
     <Project Path="ui/TownSystem.Residential.UI/TownSystem.Residential.UI.csproj" />
     <Project Path="ui/TownSystem.UIApp/TownSystem.UIApp.csproj" />
     <Project Path="ui/TownSystem.UILib/TownSystem.UILib.csproj" />
