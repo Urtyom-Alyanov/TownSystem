@@ -79,6 +79,12 @@ public sealed class FireStation : EntityBase, IBuilding
     public double Wear { get; private set; }
 
     /// <summary>
+    /// Показывает, может ли станция обслуживать пожарные команды.
+    /// При максимальном износе станция неработоспособна.
+    /// </summary>
+    public bool IsOperational => Wear < 1;
+
+    /// <summary>
     /// Увеличивает износ станции.
     /// </summary>
     public void ApplyDamage(double amount)

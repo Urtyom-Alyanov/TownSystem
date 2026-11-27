@@ -40,6 +40,21 @@ public interface IFireServiceManagementService
     bool ReleaseTeam(EntityId teamId);
 
     /// <summary>
+    /// Наносит повреждения пожарной станции.
+    /// </summary>
+    bool ApplyStationDamage(EntityId stationId, double amount);
+
+    /// <summary>
+    /// Ремонтирует пожарную станцию.
+    /// </summary>
+    bool RepairStation(EntityId stationId, double amount);
+
+    /// <summary>
+    /// Изменяет состояние дежурства сотрудника.
+    /// </summary>
+    bool SetFirefighterDuty(EntityId firefighterId, bool isOnDuty);
+
+    /// <summary>
     /// Находит пожарную станцию.
     /// </summary>
     FireStation? FindStation(EntityId id);

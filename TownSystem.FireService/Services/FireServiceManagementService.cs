@@ -54,6 +54,23 @@ public sealed class FireServiceManagementService
         _stations.Add(station.Id, station);
         return true;
     }
+    public bool ApplyStationDamage(EntityId stationId, double amount)
+    {
+        if (!_stations.TryGetValue(stationId, out FireStation? station))
+            return false;
+
+        station.ApplyDamage(amount);
+        return true;
+    }
+
+    public bool RepairStation(EntityId stationId, double amount)
+    {
+        if (!_stations.TryGetValue(stationId, out FireStation? station))
+            return false;
+
+        station.Repair(amount);
+        return true;
+    }
 
     public bool TryAssignTeam(EntityId stationId, RescueTeam team)
     {
@@ -66,6 +83,9 @@ public sealed class FireServiceManagementService
             return false;
 
         if (team.StationId is not null && team.StationId != stationId)
+            return false;
+
+        if (!station.IsOperational)
             return false;
 
         int currentMembers = _teams.Values
@@ -97,7 +117,31 @@ public sealed class FireServiceManagementService
         if (!_teams.TryGetValue(teamId, out RescueTeam? team))
             return false;
 
+        if (team.StationId is null)
+            return false;
+
+        if (!_stations.TryGetValue(
+                team.StationId.Value,
+                out FireStation? station))
+            return false;
+
+        if (!station.IsOperational)
+            return false;
+
         return team.TryDispatch();
+    }
+    public bool SetFirefighterDuty(
+    EntityId firefighterId,
+    bool isOnDuty)
+    {
+        Firefighter? firefighter = _teams.Values
+            .SelectMany(team => team.Members)
+            .FirstOrDefault(member => member.Id == firefighterId);
+
+        if (firefighter is null)
+            return false;
+
+        return firefighter.TrySetOnDuty(isOnDuty);
     }
 
     public bool ReleaseTeam(EntityId teamId)

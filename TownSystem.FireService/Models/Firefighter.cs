@@ -48,17 +48,33 @@ public sealed class Firefighter : EntityBase
 
     public int ExperienceYears { get; }
 
-    public bool IsOnDuty { get; }
+    public bool IsOnDuty { get; private set; }
 
     public bool IsAvailable { get; private set; }
 
+    private bool _isDispatched;
+
+    internal bool TrySetOnDuty(bool isOnDuty)
+    {
+        // Нельзя закончить смену, находясь на вызове.
+        if (_isDispatched && !isOnDuty)
+            return false;
+
+        IsOnDuty = isOnDuty;
+        IsAvailable = IsOnDuty && !_isDispatched;
+
+        return true;
+    }
+
     internal void SetDispatched()
     {
+        _isDispatched = true;
         IsAvailable = false;
     }
 
     internal void SetAvailable()
     {
+        _isDispatched = false;
         IsAvailable = IsOnDuty;
     }
 }
