@@ -305,6 +305,14 @@ public sealed class FireServiceModule : ISimulationModule, ISaveable
             }
         }
 
+        // Каждая выехавшая команда должна иметь ровно один активный вызов,
+        // и каждый активный вызов должен ссылаться на выехавшую команду.
+        if (!dispatchedTeamIds.SetEquals(assignedTeamIds))
+        {
+            throw new InvalidDataException(
+                "Список выехавших команд не соответствует активным назначениям.");
+        }
+
         var pendingItems = new List<(EmergencyReported Emergency, long Order)>();
         var pendingIds = new HashSet<Guid>();
         var pendingOrders = new HashSet<long>();
