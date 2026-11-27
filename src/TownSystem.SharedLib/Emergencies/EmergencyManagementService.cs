@@ -125,4 +125,31 @@ public sealed class EmergencyManagementService
 
         return true;
     }
+
+    /// <summary>
+    /// Восстанавливает список происшествий без публикации событий.
+    /// </summary>
+    internal void RestoreIncidents(
+        IEnumerable<EmergencyIncident> incidents)
+    {
+        ArgumentNullException.ThrowIfNull(incidents);
+
+        var restored = incidents.ToArray();
+        var dictionary = new Dictionary<EntityId, EmergencyIncident>();
+
+        foreach (var incident in restored)
+        {
+            if (!dictionary.TryAdd(incident.Id, incident))
+                throw new InvalidDataException(
+                    $"Повторяющийся идентификатор происшествия: {incident.Id}");
+        }
+
+        lock (_sync)
+        {
+            _incidents.Clear();
+
+            foreach (var pair in dictionary)
+                _incidents.Add(pair.Key, pair.Value);
+        }
+    }
 }

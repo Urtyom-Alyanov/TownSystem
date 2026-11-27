@@ -234,6 +234,111 @@ public sealed class FireServiceManagementService
         return true;
     }
 
+    /// <summary>
+    /// Восстанавливает станции и команды из сохранения.
+    /// Существующие станции заменяются восстановленными через общий реестр зданий.
+    /// </summary>
+    internal void RestoreState(
+        IEnumerable<FireStation> stations,
+        IEnumerable<(RescueTeam Team, EntityId? StationId, bool IsDispatched)> teams)
+    {
+        ArgumentNullException.ThrowIfNull(stations);
+        ArgumentNullException.ThrowIfNull(teams);
+
+        if (_buildingRegistry is null)
+            throw new InvalidOperationException(
+                "Реестр зданий ещё не подключён. Нельзя загрузить пожарные станции.");
+
+        FireStation[] restoredStations = stations.ToArray();
+        var restoredTeams = teams.ToArray();
+
+        var stationIds = restoredStations
+            .Select(station => station.Id)
+            .ToHashSet();
+
+        if (stationIds.Count != restoredStations.Length)
+            throw new InvalidDataException(
+                "В сохранении повторяется идентификатор пожарной станции.");
+
+        if (restoredTeams.Select(item => item.Team.Id).Distinct().Count() !=
+            restoredTeams.Length)
+        {
+            throw new InvalidDataException(
+                "В сохранении повторяется идентификатор пожарной команды.");
+        }
+
+        var firefighterIds = new HashSet<EntityId>();
+        var membersPerStation = new Dictionary<EntityId, int>();
+
+        foreach (var item in restoredTeams)
+        {
+            foreach (Firefighter member in item.Team.Members)
+            {
+                if (!firefighterIds.Add(member.Id))
+                    throw new InvalidDataException(
+                        $"Пожарный {member.Id} указан более чем в одной команде.");
+
+                if (item.IsDispatched && !member.IsOnDuty)
+                    throw new InvalidDataException(
+                        "В сохранении на выезде находится команда с недежурным сотрудником.");
+            }
+
+            if (item.StationId is EntityId stationId)
+            {
+                if (!stationIds.Contains(stationId) && !item.IsDispatched)
+                    throw new InvalidDataException(
+                        "Команда привязана к отсутствующей станции, но не находится на выезде.");
+
+                if (stationIds.Contains(stationId))
+                {
+                    int currentCount = membersPerStation.GetValueOrDefault(stationId);
+                    int nextCount = currentCount + item.Team.Members.Count;
+                    FireStation station = restoredStations.Single(
+                        candidate => candidate.Id == stationId);
+
+                    if (nextCount > station.Capacity)
+                        throw new InvalidDataException(
+                            $"Превышена вместимость пожарной станции {station.Name}.");
+
+                    membersPerStation[stationId] = nextCount;
+                }
+            }
+            else if (item.IsDispatched)
+            {
+                throw new InvalidDataException(
+                    "Команда на выезде не привязана к пожарной станции.");
+            }
+        }
+
+        // Удаляем ранее загруженные станции из общего реестра.
+        foreach (EntityId stationId in _stations.Keys.ToArray())
+            _buildingRegistry.Remove(stationId);
+
+        _stations.Clear();
+        _teams.Clear();
+
+        foreach (FireStation station in restoredStations)
+        {
+            if (!_buildingRegistry.TryAdd(station))
+                throw new InvalidDataException(
+                    $"Не удалось восстановить пожарную станцию '{station.Name}' в общем реестре зданий.");
+
+            _stations.Add(station.Id, station);
+        }
+
+        foreach (var item in restoredTeams)
+        {
+            if (item.StationId is EntityId stationId)
+                item.Team.AssignToStation(stationId);
+
+            _teams.Add(item.Team.Id, item.Team);
+
+            if (item.IsDispatched && !item.Team.TryDispatch())
+                throw new InvalidDataException(
+                    $"Не удалось восстановить выезд пожарной команды {item.Team.Id}.");
+        }
+    }
+
     public FireStation? FindStation(EntityId id)
     {
         return _stations.GetValueOrDefault(id);
