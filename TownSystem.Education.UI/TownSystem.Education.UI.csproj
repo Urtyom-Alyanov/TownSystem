@@ -8,4 +8,9 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TownSystem.Education\TownSystem.Education.csproj" />
+    <ProjectReference Include="..\ui\TownSystem.UILib\TownSystem.UILib.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -11,7 +11,14 @@ public interface IEducationBuilding : IBuilding
     uint Teachers { get; }
 }
 
-public sealed record Enrollment(EntityId StudentId, EntityId BuildingId, SchoolLevel Level, DateTime StartedAt);
+public sealed record Enrollment(EntityId StudentId, EntityId BuildingId, SchoolLevel Level, DateTime StartedAt) : IEntity
+{
+    // Генерируем уникальный ID для самого факта зачисления
+    public EntityId Id { get; init; } = EntityId.New();
+
+    // В списке будет показываться текст вместо имени
+    public string Name => $"Студент {StudentId.ToString()[..4]}...";
+}
 
 public interface IEducationService
 {
