@@ -1,5 +1,3 @@
-using NUnit.Framework;
-
 using TownSystem.Map.Models;
 using TownSystem.Map.Services;
 using TownSystem.Map.Terrains;

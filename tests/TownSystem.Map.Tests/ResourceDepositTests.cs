@@ -1,5 +1,3 @@
-using NUnit.Framework;
-
 using TownSystem.Map.Models;
 
 namespace TownSystem.Map.Tests;
