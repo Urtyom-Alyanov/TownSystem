@@ -11,7 +11,7 @@ public sealed class FireServiceModule : ISimulationModule
 {
     private IWorld? _world;
     private FireServiceManagementService? _service;
-
+    private IDisposable? _buildingRemovedSubscription;
     private readonly Dictionary<Guid, EntityId> _emergencyTeams = new();
 
     private readonly PriorityQueue<
@@ -50,6 +50,9 @@ public sealed class FireServiceModule : ISimulationModule
         _cancelledSubscription =
             world.Events.Subscribe<EmergencyCancelled>(
                 HandleEmergencyCancelled);
+        _buildingRemovedSubscription =
+            world.Events.Subscribe<BuildingRemoved>(
+                HandleBuildingRemoved);
     }
 
     public void OnWorldReady()
@@ -67,6 +70,11 @@ public sealed class FireServiceModule : ISimulationModule
     public void Tick(TickContext context)
     {
         DispatchPendingEmergencies();
+    }
+
+    private void HandleBuildingRemoved(BuildingRemoved building)
+    {
+        _service?.RemoveStation(building.BuildingId);
     }
 
     private void HandleEmergencyReported(EmergencyReported emergency)

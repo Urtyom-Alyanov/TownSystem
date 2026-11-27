@@ -162,6 +162,25 @@ public sealed class FireServiceManagementService
         return team.TryRemoveMember(firefighterId);
     }
 
+    /// <summary>
+    /// Обрабатывает удаление пожарной станции из общего реестра.
+    /// </summary>
+    internal bool RemoveStation(EntityId stationId)
+    {
+        if (!_stations.Remove(stationId))
+            return false;
+
+        foreach (var team in _teams.Values.Where(
+                     team => team.StationId == stationId))
+        {
+            // Команды, которые не находятся на выезде,
+            // освобождаются от привязки к станции.
+            team.TryUnassignFromStation();
+        }
+
+        return true;
+    }
+
     public bool TryDispatchTeam(EntityId teamId)
     {
         if (!_teams.TryGetValue(teamId, out RescueTeam? team))
@@ -203,6 +222,15 @@ public sealed class FireServiceManagementService
             return false;
 
         team.Release();
+
+        // Если станцию снесли во время выезда,
+        // после возвращения команда отвязывается от неё.
+        if (team.StationId is EntityId stationId &&
+            !_stations.ContainsKey(stationId))
+        {
+            team.TryUnassignFromStation();
+        }
+
         return true;
     }
 

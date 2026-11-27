@@ -56,6 +56,21 @@ public sealed class RescueTeam : EntityBase
     public int AvailableMemberCount =>
         _members.Count(member => member.IsAvailable);
 
+    /// <summary>
+    /// Отвязывает команду от пожарной станции.
+    /// </summary>
+    internal bool TryUnassignFromStation()
+    {
+        if (Status != RescueTeamStatus.Available)
+            return false;
+
+        StationId = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Привязываем команду к пожарной станции.
+    /// </summary>
     internal void AssignToStation(EntityId stationId)
     {
         if (StationId is not null && StationId != stationId)
