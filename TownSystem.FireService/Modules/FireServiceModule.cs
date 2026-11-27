@@ -1,23 +1,26 @@
-﻿
+﻿using TownSystem.FireService.Models;
 using TownSystem.FireService.Services;
 using TownSystem.SharedLib.Contracts;
+using TownSystem.SharedLib.Core;
 using TownSystem.SharedLib.Events;
 using TownSystem.SharedLib.Simulation;
 
 namespace TownSystem.FireService.Modules;
 
-/// <summary>
-/// Подключает пожарную службу к миру симуляции
-/// и обрабатывает события чрезвычайных происшествий.
-/// </summary>
 public sealed class FireServiceModule : ISimulationModule
 {
     private IWorld? _world;
     private FireServiceManagementService? _service;
 
-    // Связь между происшествием и отправленной командой.
-    private readonly Dictionary<Guid, TownSystem.SharedLib.Core.EntityId>
-        _emergencyTeams = new();
+    private readonly Dictionary<Guid, EntityId> _emergencyTeams = new();
+
+    private readonly PriorityQueue<
+    EmergencyReported,
+    (int Severity, long Order)> _pendingEmergencies = new();
+
+    private long _nextEmergencyOrder;
+
+    private readonly HashSet<Guid> _pendingEmergencyIds = new();
 
     private IDisposable? _reportedSubscription;
     private IDisposable? _resolvedSubscription;
@@ -32,12 +35,10 @@ public sealed class FireServiceModule : ISimulationModule
         ArgumentNullException.ThrowIfNull(world);
 
         _world = world;
-
         _service = new FireServiceManagementService();
 
         world.RegisterService<IFireServiceManagementService>(_service);
 
-        // Подписываемся на события происшествий.
         _reportedSubscription =
             world.Events.Subscribe<EmergencyReported>(
                 HandleEmergencyReported);
@@ -57,82 +58,115 @@ public sealed class FireServiceModule : ISimulationModule
             throw new InvalidOperationException(
                 "Пожарная служба не была инициализирована.");
 
-        IBuildingRegistry buildingRegistry =
+        IBuildingRegistry registry =
             _world.GetService<IBuildingRegistry>();
 
-        _service.SetBuildingRegistry(buildingRegistry);
+        _service.SetBuildingRegistry(registry);
     }
 
     public void Tick(TickContext context)
     {
-        // Автоматическая обработка происшествий выполняется
-        // через события IEventBus.
+        DispatchPendingEmergencies();
+    }
+
+    private void HandleEmergencyReported(EmergencyReported emergency)
+    {
+        if (_service is null ||
+            emergency.Kind != EmergencyKind.Fire)
+            return;
+
+        if (_emergencyTeams.ContainsKey(emergency.EmergencyId) ||
+            !_pendingEmergencyIds.Add(emergency.EmergencyId))
+            return;
+
+        _pendingEmergencies.Enqueue(
+        emergency,
+        (-emergency.Severity, _nextEmergencyOrder++));
+
+        DispatchPendingEmergencies();
     }
 
     /// <summary>
-    /// Реакция на новое происшествие.
+    /// Распределяет ожидающие вызовы между свободными командами.
     /// </summary>
-    private void HandleEmergencyReported(EmergencyReported emergency)
+    private void DispatchPendingEmergencies()
     {
         if (_service is null)
             return;
 
-        // На этом этапе пожарная служба реагирует только на пожары.
-        if (emergency.Kind != EmergencyKind.Fire)
-            return;
-
-        // Не отправляем команду повторно на одно происшествие.
-        if (_emergencyTeams.ContainsKey(emergency.EmergencyId))
-            return;
-
-        // Ищем первую свободную команду, закреплённую за станцией.
-        var team = _service.Teams.FirstOrDefault(
-            team => team.IsAvailable && team.StationId is not null);
-
-        if (team is null)
-            return;
-
-        // Отправляем команду.
-        if (_service.TryDispatchTeam(team.Id))
+        while (_pendingEmergencies.Count > 0)
         {
-            _emergencyTeams.Add(
-                emergency.EmergencyId,
-                team.Id);
+            EmergencyReported emergency = _pendingEmergencies.Peek();
+
+            // Пропускаем уже отменённые или завершённые вызовы.
+            if (!_pendingEmergencyIds.Contains(emergency.EmergencyId))
+            {
+                _pendingEmergencies.Dequeue();
+                continue;
+            }
+
+            // Сначала рассматриваем команды ближайших станций.
+            var candidates = _service.Teams
+                .Where(team =>
+                    team.IsAvailable &&
+                    team.StationId.HasValue)
+                .Select(team => new
+                {
+                    Team = team,
+                    Station = _service.FindStation(
+                        team.StationId!.Value)
+                })
+                .Where(item => item.Station is not null)
+                .OrderBy(item =>
+                    item.Station!.Position.DistanceTo(emergency.Location))
+                .ToArray();
+
+            Models.RescueTeam? selectedTeam = null;
+
+            foreach (var candidate in candidates)
+            {
+                if (_service.TryDispatchTeam(candidate.Team.Id))
+                {
+                    selectedTeam = candidate.Team;
+                    break;
+                }
+            }
+
+            // Нет свободных команд — оставляем вызов в очереди.
+            if (selectedTeam is null)
+                return;
+
+            _pendingEmergencies.Dequeue();
+            _pendingEmergencyIds.Remove(emergency.EmergencyId);
+
+            _emergencyTeams[emergency.EmergencyId] = selectedTeam.Id;
         }
     }
 
-    /// <summary>
-    /// Реакция на устранение происшествия.
-    /// </summary>
     private void HandleEmergencyResolved(EmergencyResolved emergency)
     {
         ReleaseTeamForEmergency(emergency.EmergencyId);
     }
 
-    /// <summary>
-    /// Реакция на отмену происшествия.
-    /// </summary>
     private void HandleEmergencyCancelled(EmergencyCancelled emergency)
     {
         ReleaseTeamForEmergency(emergency.EmergencyId);
     }
 
-    /// <summary>
-    /// Освобождает команду, связанную с происшествием.
-    /// </summary>
     private void ReleaseTeamForEmergency(Guid emergencyId)
     {
         if (_service is null)
             return;
 
-        if (!_emergencyTeams.TryGetValue(
-                emergencyId,
-                out var teamId))
+        if (_emergencyTeams.Remove(emergencyId, out EntityId teamId))
         {
-            return;
+            _service.ReleaseTeam(teamId);
         }
 
-        _service.ReleaseTeam(teamId);
-        _emergencyTeams.Remove(emergencyId);
+        // Удаляем ожидающий вызов, если команда ещё не была назначена.
+        _pendingEmergencyIds.Remove(emergencyId);
+
+        // Освободившаяся команда может принять следующий вызов.
+        DispatchPendingEmergencies();
     }
 }
