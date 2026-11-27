@@ -10,6 +10,7 @@
     <Project Path="tests/TownSystem.SharedLib.Tests/TownSystem.SharedLib.Tests.csproj" />
   </Folder>
   <Folder Name="/ui/">
+    <Project Path="TownSystem.Education.UI/TownSystem.Education.UI.csproj" Id="c4e6e413-e967-49a4-801f-d5c74815a47a" />
     <Project Path="ui/TownSystem.Map.UI/TownSystem.Map.UI.csproj" Id="be18ef4b-dd7d-4bff-bc60-d8e6bf405a41" />
     <Project Path="ui/TownSystem.UIApp/TownSystem.UIApp.csproj" />
     <Project Path="ui/TownSystem.UILib/TownSystem.UILib.csproj" />
