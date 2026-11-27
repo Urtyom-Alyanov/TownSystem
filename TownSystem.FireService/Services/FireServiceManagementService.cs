@@ -112,6 +112,56 @@ public sealed class FireServiceManagementService
         return true;
     }
 
+    public bool TryAddFirefighterToTeam(
+    EntityId teamId,
+    Firefighter firefighter)
+    {
+        ArgumentNullException.ThrowIfNull(firefighter);
+
+        if (!_teams.TryGetValue(teamId, out RescueTeam? team))
+            return false;
+
+        if (team.Status != RescueTeamStatus.Available)
+            return false;
+
+        // Проверяем, что сотрудник ещё не состоит в другой команде.
+        bool alreadyAssigned = _teams.Values
+            .SelectMany(existingTeam => existingTeam.Members)
+            .Any(member => member.Id == firefighter.Id);
+
+        if (alreadyAssigned)
+            return false;
+
+        // Проверяем вместимость станции.
+        if (team.StationId is EntityId stationId)
+        {
+            if (!_stations.TryGetValue(
+                    stationId,
+                    out FireStation? station))
+                return false;
+
+            long currentMembers = _teams.Values
+                .Where(existingTeam =>
+                    existingTeam.StationId == stationId)
+                .Sum(existingTeam => existingTeam.Members.Count);
+
+            if (currentMembers + 1 > station.Capacity)
+                return false;
+        }
+
+        return team.TryAddMember(firefighter);
+    }
+
+    public bool TryRemoveFirefighterFromTeam(
+        EntityId teamId,
+        EntityId firefighterId)
+    {
+        if (!_teams.TryGetValue(teamId, out RescueTeam? team))
+            return false;
+
+        return team.TryRemoveMember(firefighterId);
+    }
+
     public bool TryDispatchTeam(EntityId teamId)
     {
         if (!_teams.TryGetValue(teamId, out RescueTeam? team))

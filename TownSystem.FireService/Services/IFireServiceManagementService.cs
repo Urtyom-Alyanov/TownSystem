@@ -55,6 +55,20 @@ public interface IFireServiceManagementService
     bool SetFirefighterDuty(EntityId firefighterId, bool isOnDuty);
 
     /// <summary>
+    /// Добавляет пожарного в существующую команду.
+    /// </summary>
+    bool TryAddFirefighterToTeam(
+        EntityId teamId,
+        Firefighter firefighter);
+
+    /// <summary>
+    /// Удаляет пожарного из команды.
+    /// </summary>
+    bool TryRemoveFirefighterFromTeam(
+        EntityId teamId,
+        EntityId firefighterId);
+
+    /// <summary>
     /// Находит пожарную станцию.
     /// </summary>
     FireStation? FindStation(EntityId id);

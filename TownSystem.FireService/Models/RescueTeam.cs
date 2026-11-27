@@ -85,4 +85,42 @@ public sealed class RescueTeam : EntityBase
         foreach (Firefighter member in _members)
             member.SetAvailable();
     }
+    /// <summary>
+    /// Добавляет сотрудника в команду.
+    /// </summary>
+    internal bool TryAddMember(Firefighter firefighter)
+    {
+        ArgumentNullException.ThrowIfNull(firefighter);
+
+        if (Status != RescueTeamStatus.Available)
+            return false;
+
+        if (_members.Any(member => member.Id == firefighter.Id))
+            return false;
+
+        _members.Add(firefighter);
+        return true;
+    }
+
+    /// <summary>
+    /// Удаляет сотрудника из команды.
+    /// </summary>
+    internal bool TryRemoveMember(EntityId firefighterId)
+    {
+        if (Status != RescueTeamStatus.Available)
+            return false;
+
+        // В команде должен оставаться хотя бы один сотрудник.
+        if (_members.Count <= 1)
+            return false;
+
+        int index = _members.FindIndex(
+            member => member.Id == firefighterId);
+
+        if (index < 0)
+            return false;
+
+        _members.RemoveAt(index);
+        return true;
+    }
 }
