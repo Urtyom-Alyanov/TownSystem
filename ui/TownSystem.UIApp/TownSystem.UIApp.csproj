@@ -8,4 +8,13 @@
         <UseWPF>true</UseWPF>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\TownSystem.Map\TownSystem.Map.csproj" />
+      <ProjectReference Include="..\..\TownSystem.Education.UI\TownSystem.Education.UI.csproj" />
+      <ProjectReference Include="..\..\TownSystem.Education\TownSystem.Education.csproj" />
+      <ProjectReference Include="..\..\TownSystem.HR.UI\TownSystem.HR.UI.csproj" />
+      <ProjectReference Include="..\..\TownSystem.HR\TownSystem.HR.csproj" />
+      <ProjectReference Include="..\TownSystem.Map.UI\TownSystem.Map.UI.csproj" />
+    </ItemGroup>
+
 </Project>
