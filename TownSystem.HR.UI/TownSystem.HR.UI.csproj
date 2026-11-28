@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\TownSystem.HR\TownSystem.HR.csproj" />
+    <ProjectReference Include="..\TownSystem.HR\TownSystem.HR.csproj" />
     <ProjectReference Include="..\ui\TownSystem.UILib\TownSystem.UILib.csproj" />
   </ItemGroup>
 

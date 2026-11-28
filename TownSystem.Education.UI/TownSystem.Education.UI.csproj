@@ -10,7 +10,7 @@
 
   <ItemGroup>
     <!-- Убрали одну точку с запятой (..\src вместо ..\..\src) -->
-    <ProjectReference Include="..\src\TownSystem.Education\TownSystem.Education.csproj" />
+    <ProjectReference Include="..\TownSystem.Education\TownSystem.Education.csproj" />
     <ProjectReference Include="..\ui\TownSystem.UILib\TownSystem.UILib.csproj" />
   </ItemGroup>
 

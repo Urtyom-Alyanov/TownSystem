@@ -8,6 +8,8 @@
   <Folder Name="/tests/">
     <Project Path="tests/TownSystem.Map.Tests/TownSystem.Map.Tests.csproj" Id="ea358254-c6e9-4150-8c2b-38667488609d" />
     <Project Path="tests/TownSystem.SharedLib.Tests/TownSystem.SharedLib.Tests.csproj" />
+    <Project Path="TownSystem.Education.Tests/TownSystem.Education.Tests.csproj" Id="82297282-7393-4554-9678-489fc34c8092" />
+    <Project Path="TownSystem.HR.Tests/TownSystem.HR.Tests.csproj" Id="b3703331-5d32-4c86-a9f3-74535b419085" />
   </Folder>
   <Folder Name="/ui/">
     <Project Path="TownSystem.Education.UI/TownSystem.Education.UI.csproj" Id="c4e6e413-e967-49a4-801f-d5c74815a47a" />
