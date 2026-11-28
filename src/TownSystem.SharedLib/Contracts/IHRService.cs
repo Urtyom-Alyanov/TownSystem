@@ -2,7 +2,11 @@
 
 namespace TownSystem.SharedLib.Contracts;
 
-public sealed record Vacancy(EntityId DepartmentId, string Position, EducationLevel Required, uint Open);
+public sealed record Vacancy(EntityId DepartmentId, string Position, EducationLevel Required, uint Open) : IEntity
+{
+    public EntityId Id { get; init; } = EntityId.New();
+    public string Name => $"{Position} ({Open} мест)";
+}
 
 public interface IEmployee : IEntity
 {

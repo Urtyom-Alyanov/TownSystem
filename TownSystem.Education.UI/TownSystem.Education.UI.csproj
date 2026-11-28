@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -9,8 +9,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TownSystem.Education\TownSystem.Education.csproj" />
+    <!-- Убрали одну точку с запятой (..\src вместо ..\..\src) -->
+    <ProjectReference Include="..\src\TownSystem.Education\TownSystem.Education.csproj" />
     <ProjectReference Include="..\ui\TownSystem.UILib\TownSystem.UILib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Views\EducationView.xaml.cs">
+      <DependentUpon>EducationView.xaml</DependentUpon>
+    </Compile>
+    <Page Update="Views\EducationView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Templates.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
 
 </Project>

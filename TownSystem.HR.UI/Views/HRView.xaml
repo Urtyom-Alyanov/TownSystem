@@ -1,0 +1,22 @@
+﻿<UserControl x:Class="TownSystem.HR.UI.Views.HRView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <GroupBox Header="Сотрудники">
+            <ListBox ItemsSource="{Binding Employees.Items}"
+                     SelectedItem="{Binding Employees.SelectedItem}"
+                     DisplayMemberPath="Name"/>
+        </GroupBox>
+
+        <GroupBox Grid.Column="1" Header="Вакансии">
+            <ListBox ItemsSource="{Binding Vacancies.Items}"
+                     SelectedItem="{Binding Vacancies.SelectedItem}"
+                     DisplayMemberPath="Name"/>
+        </GroupBox>
+    </Grid>
+</UserControl>

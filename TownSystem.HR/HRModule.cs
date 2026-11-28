@@ -5,6 +5,7 @@ using TownSystem.HR.Services;
 using TownSystem.SharedLib.Contracts;
 using TownSystem.SharedLib.Persistence;
 using TownSystem.SharedLib.Simulation;
+using TownSystem.SharedLib.Core;
 
 namespace TownSystem.HR;
 
@@ -52,14 +53,26 @@ public sealed class HRModule : ISimulationModule, ISaveable
 
     public void Load(JsonNode state) { }
 
-    private sealed class LazyHRService(HRModule owner) : IHRService
+    private sealed class LazyHRService : IHRService
     {
-        private IHRService Real => owner._service ?? throw new InvalidOperationException("HR не готов");
+        private readonly HRModule _owner;
+        public LazyHRService(HRModule owner) => _owner = owner;
+
+        private IHRService Real => _owner._service ?? throw new InvalidOperationException("HR не готов");
+
         public IReadOnlyCollection<IEmployee> Employees => Real.Employees;
         public IReadOnlyCollection<Vacancy> Vacancies => Real.Vacancies;
-        public bool OpenVacancy(EntityId d, string p, EducationLevel q, uint c) => Real.OpenVacancy(d, p, q, c);
-        public bool TryHire(EntityId p, EntityId d) => Real.TryHire(p, d);
-        public bool TryFire(EntityId e) => Real.TryFire(e);
-        public bool TryTransfer(EntityId e, EntityId d) => Real.TryTransfer(e, d);
+
+        public bool OpenVacancy(EntityId departmentId, string position, EducationLevel required, uint count)
+            => Real.OpenVacancy(departmentId, position, required, count);
+
+        public bool TryHire(EntityId personId, EntityId departmentId)
+            => Real.TryHire(personId, departmentId);
+
+        public bool TryFire(EntityId employeeId)
+            => Real.TryFire(employeeId);
+
+        public bool TryTransfer(EntityId employeeId, EntityId toDepartmentId)
+            => Real.TryTransfer(employeeId, toDepartmentId);
     }
 }
